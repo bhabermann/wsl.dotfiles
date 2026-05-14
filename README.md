@@ -22,7 +22,8 @@ For automation:
   --git-name "Your Name" \
   --git-email you@example.com \
   --tools recommended \
-  --docker desktop
+  --docker desktop \
+  --default-shell zsh
 ```
 
 ## Commands
@@ -45,6 +46,9 @@ Useful install options:
 `--dry-run` shows the environment, identity, tool choices, Docker strategy, and
 installation plan without creating files, links, backups, or installing tools.
 `--no-doctor` skips the final doctor checks after a normal install.
+Interactive mode asks whether zsh should become the login shell. In
+non-interactive mode, the login shell is left unchanged unless
+`--default-shell zsh` is provided.
 
 ## Interactive Tool Selection
 
@@ -147,6 +151,7 @@ The pipeline builds `Dockerfile.test` with Ubuntu 24.04 and runs:
 - Tool selection parser tests for presets, `--with`, `--without`, and Docker strategy.
 - Non-interactive install in `DOTFILES_TEST_MODE=1` with an isolated fake home.
 - Dry-run and no-doctor behavior checks.
+- zsh startup checks for repo root detection, aliases, and module loading.
 - Idempotency checks that local identity and SSH config are not overwritten.
 - `verify` and `doctor` smoke tests.
 

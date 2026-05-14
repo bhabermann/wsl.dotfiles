@@ -1,7 +1,17 @@
-export DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+if [[ -z "${DOTFILES:-}" ]]; then
+  _dotfiles_root_file="$HOME/.config/dotfiles/root"
+  if [[ -r "$_dotfiles_root_file" ]]; then
+    DOTFILES="$(<"$_dotfiles_root_file")"
+  else
+    _zshrc_path="${${(%):-%x}:A}"
+    DOTFILES="${_zshrc_path:h:h}"
+  fi
+  [[ -d "$DOTFILES" ]] || DOTFILES="$HOME/.dotfiles"
+  export DOTFILES
+fi
 
-for rc in "$DOTFILES"/zsh/rc.d/*.zsh; do
+for rc in "$DOTFILES"/zsh/rc.d/*.zsh(N); do
   [[ -r "$rc" ]] && source "$rc"
 done
 
-unset rc
+unset rc _dotfiles_root_file _zshrc_path

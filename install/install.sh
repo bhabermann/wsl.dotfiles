@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 action_install() {
-  local selected_groups group profile_source identity_status docker_choice
+  local selected_groups group profile_source identity_status docker_choice default_shell_choice
 
   section "Environment"
   [[ "$DOTFILES_ROOT" == /mnt/* ]] && warn "Recommended: clone dotfiles under the Linux filesystem, not /mnt/c."
@@ -39,6 +39,7 @@ action_install() {
   field "Git identity" "$identity_status"
 
   mapfile -t selected_groups < <(resolve_tool_selection "$@")
+  default_shell_choice="$(resolve_default_shell)"
 
   section "Installation Plan"
   field "Profile" "$PROFILE"
@@ -49,6 +50,7 @@ action_install() {
     docker_choice="$(docker_strategy_label docker-wsl-engine)"
   fi
   field "Docker" "$docker_choice"
+  field "Default shell" "$default_shell_choice"
   field "Git identity" "$identity_status"
   info "Tools:"
   for group in "${selected_groups[@]}"; do
@@ -91,6 +93,8 @@ action_install() {
     esac
   done
 
+  apply_default_shell "$default_shell_choice"
+
   section "Linking"
   "$DOTFILES_ROOT/install/link.sh"
   if [[ "${NO_DOCTOR:-0}" != "1" ]]; then
@@ -101,11 +105,63 @@ action_install() {
   action_complete
 }
 
+resolve_default_shell() {
+  local choice="${DEFAULT_SHELL:-}"
+
+  if [[ -z "$choice" && "${NON_INTERACTIVE:-0}" == "1" ]]; then
+    choice="unchanged"
+  fi
+
+  if [[ -z "$choice" ]]; then
+    section "Default Shell" >&2
+    printf "  %s1)%s Set zsh as login shell %s(Recommended)%s\n" "$C_LABEL" "$C_RESET" "$C_OK" "$C_RESET" >&2
+    printf "  %s2)%s Leave current shell unchanged\n" "$C_LABEL" "$C_RESET" >&2
+    choice="$(prompt_choice "Select default shell [default: 1]:" "1")"
+  fi
+
+  case "$choice" in
+    1|zsh) printf "zsh" ;;
+    2|unchanged|none|no|N|n) printf "unchanged" ;;
+    *) die "Unknown default shell choice: $choice" ;;
+  esac
+}
+
+apply_default_shell() {
+  local choice="$1"
+  local zsh_path
+
+  [[ "$choice" == "zsh" ]] || return 0
+
+  log "Configuring zsh as login shell"
+  if [[ "${DOTFILES_TEST_MODE:-0}" == "1" ]]; then
+    ok "DOTFILES_TEST_MODE: skipped login shell change"
+    return 0
+  fi
+
+  zsh_path="$(command -v zsh || true)"
+  if [[ -z "$zsh_path" ]]; then
+    warn "zsh is not available; cannot set login shell"
+    return 0
+  fi
+
+  if [[ "${SHELL:-}" == "$zsh_path" ]]; then
+    ok "zsh is already the login shell"
+    return 0
+  fi
+
+  if chsh -s "$zsh_path"; then
+    ok "Login shell set to $zsh_path"
+  else
+    warn "Could not set login shell automatically. You can retry later with: chsh -s $zsh_path"
+  fi
+}
+
 action_complete() {
   section "Complete"
   field "Restart shell" "exec zsh"
-  field "Verify later" "./setup verify"
-  field "Change tools" "./setup install --with history --docker desktop"
+  field "Preview changes" "./setup install --dry-run"
+  field "Reconfigure tools" "./setup install"
+  field "Automation example" "./setup install --non-interactive --tools recommended --docker desktop --default-shell zsh"
 }
 
 has_selected() {

@@ -12,6 +12,7 @@
 - Non-interactive mode requires `--non-interactive`.
 - `--dry-run` shows the resolved installation plan without mutating local files.
 - `--no-doctor` skips final doctor checks after install/linking.
+- `--default-shell zsh|unchanged` controls whether install attempts to make zsh the login shell.
 - Tool groups have user-facing descriptions and recommended defaults.
 - Local identity and secrets are never committed or overwritten.
 
@@ -40,4 +41,5 @@ Docker is not a tool group prompt. It is one mutually exclusive strategy:
 - Interactive prompts include labels, recommendation tags, and explanations.
 - Dry-run does not create profile, identity, links, templates, or backups.
 - No-doctor install still prints the final Complete section.
+- zsh startup resolves the installed repo root and loads aliases/modules from any checkout path.
 - `./scripts/test-docker.sh` passes on Docker with Ubuntu 24.04.

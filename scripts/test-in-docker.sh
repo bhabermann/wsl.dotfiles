@@ -41,7 +41,8 @@ mkdir -p "$HOME"
   --git-name "Test User" \
   --git-email test@example.com \
   --tools minimal \
-  --docker none 2>&1 | tee /tmp/setup-install-first.txt
+  --docker none \
+  --default-shell zsh 2>&1 | tee /tmp/setup-install-first.txt
 
 grep -q "^Environment$" /tmp/setup-install-first.txt
 grep -q "^Identity$" /tmp/setup-install-first.txt
@@ -52,8 +53,11 @@ grep -q "^Doctor$" /tmp/setup-install-first.txt
 grep -q "^Complete$" /tmp/setup-install-first.txt
 ! grep -q "Dotfiles doctor" /tmp/setup-install-first.txt
 grep -q "Git identity:.*will create" /tmp/setup-install-first.txt
+grep -q "Default shell:.*zsh" /tmp/setup-install-first.txt
+grep -q "DOTFILES_TEST_MODE: skipped login shell change" /tmp/setup-install-first.txt
 
 test "$(cat "$HOME/.config/dotfiles/profile")" = "personal"
+test "$(cat "$HOME/.config/dotfiles/root")" = "/workspace"
 test -L "$HOME/.zshrc"
 test -L "$HOME/.gitconfig"
 test -L "$HOME/.config/mise/config.toml"
@@ -63,6 +67,10 @@ test -f "$HOME/.config/git/identity.gitconfig"
 test -f "$HOME/.ssh/config"
 grep -q "Test User" "$HOME/.config/git/identity.gitconfig"
 grep -q "test@example.com" "$HOME/.config/git/identity.gitconfig"
+zsh -ic 'test "$DOTFILES" = "/workspace"'
+zsh -ic 'alias ll' | grep -q 'ls -la'
+zsh -ic 'whence -w path_prepend' | grep -q 'function'
+! zsh -ic 'true' 2>&1 | grep -q 'no matches found'
 
 echo "==> idempotency"
 before_identity="$(sha256sum "$HOME/.config/git/identity.gitconfig")"
@@ -74,10 +82,12 @@ before_ssh="$(sha256sum "$HOME/.ssh/config")"
   --git-name "Changed User" \
   --git-email changed@example.com \
   --tools minimal \
-  --docker none 2>&1 | tee /tmp/setup-install-second.txt
+  --docker none \
+  --default-shell unchanged 2>&1 | tee /tmp/setup-install-second.txt
 
 grep -q "Profile:.*personal" /tmp/setup-install-second.txt
 grep -q "Git identity:.*configured at" /tmp/setup-install-second.txt
+grep -q "Default shell:.*unchanged" /tmp/setup-install-second.txt
 
 ./setup install \
   --non-interactive \
@@ -86,6 +96,7 @@ grep -q "Git identity:.*configured at" /tmp/setup-install-second.txt
 
 grep -q "Profile:.*personal (from /tmp/dotfiles-home/.config/dotfiles/profile)" /tmp/setup-install-detected.txt
 grep -q "Git identity:.*configured at" /tmp/setup-install-detected.txt
+grep -q "Default shell:.*unchanged" /tmp/setup-install-detected.txt
 
 after_identity="$(sha256sum "$HOME/.config/git/identity.gitconfig")"
 after_ssh="$(sha256sum "$HOME/.ssh/config")"
@@ -114,6 +125,7 @@ grep -q "Dry run:.*no changes were made" /tmp/setup-dry-run.txt
 test ! -e /tmp/dotfiles-dry-home/.zshrc
 test ! -e /tmp/dotfiles-dry-home/.gitconfig
 test ! -e /tmp/dotfiles-dry-home/.config/dotfiles/profile
+test ! -e /tmp/dotfiles-dry-home/.config/dotfiles/root
 test ! -e /tmp/dotfiles-dry-home/.config/git/identity.gitconfig
 
 echo "==> no-doctor"
@@ -126,16 +138,19 @@ HOME=/tmp/dotfiles-no-doctor-home ./setup install \
   --git-name "No Doctor" \
   --git-email nodoctor@example.com \
   --tools minimal \
-  --docker none 2>&1 | tee /tmp/setup-no-doctor.txt
+  --docker none \
+  --default-shell zsh 2>&1 | tee /tmp/setup-no-doctor.txt
 
 grep -q "^Complete$" /tmp/setup-no-doctor.txt
 ! grep -q "^Doctor$" /tmp/setup-no-doctor.txt
+grep -q "DOTFILES_TEST_MODE: skipped login shell change" /tmp/setup-no-doctor.txt
 
 echo "==> verify/doctor smoke"
 ./setup verify || true
 ./setup doctor >/tmp/setup-doctor.txt
 grep -q "^Doctor$" /tmp/setup-doctor.txt
 ! grep -q "Dotfiles doctor" /tmp/setup-doctor.txt
+grep -q "Available follow-ups" /tmp/setup-doctor.txt
 
 docker_warns="$(grep -c "Docker missing or Docker Desktop WSL integration disabled" /tmp/setup-doctor.txt || true)"
 test "$docker_warns" -le 1

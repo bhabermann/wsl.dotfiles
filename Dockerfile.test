@@ -12,6 +12,7 @@ RUN apt-get update \
     git \
     grep \
     sed \
+    zsh \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace

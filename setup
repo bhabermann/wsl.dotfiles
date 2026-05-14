@@ -14,6 +14,7 @@ GIT_NAME=""
 GIT_EMAIL=""
 TOOLS_PRESET="recommended"
 DOCKER_STRATEGY=""
+DEFAULT_SHELL=""
 VERBOSE=0
 LOG_ENABLED=0
 DRY_RUN=0
@@ -42,6 +43,7 @@ Options:
   --with ITEM                   Add a tool or group
   --without ITEM                Remove a tool or group
   --docker desktop|wsl-engine|none
+  --default-shell zsh|unchanged
   --dry-run                   Show the installation plan without changing files
   --no-doctor                 Skip final doctor checks after install/linking
   --verbose
@@ -93,6 +95,10 @@ while [[ $# -gt 0 ]]; do
       DOCKER_STRATEGY="${2:-}"
       shift 2
       ;;
+    --default-shell)
+      DEFAULT_SHELL="${2:-}"
+      shift 2
+      ;;
     --dry-run)
       DRY_RUN=1
       shift
@@ -119,7 +125,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-export NON_INTERACTIVE PROFILE GIT_NAME GIT_EMAIL TOOLS_PRESET DOCKER_STRATEGY VERBOSE LOG_ENABLED DRY_RUN NO_DOCTOR
+export NON_INTERACTIVE PROFILE GIT_NAME GIT_EMAIL TOOLS_PRESET DOCKER_STRATEGY DEFAULT_SHELL VERBOSE LOG_ENABLED DRY_RUN NO_DOCTOR
 
 case "$COMMAND" in
   install)

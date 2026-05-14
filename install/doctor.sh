@@ -17,8 +17,8 @@ action_doctor() {
     warn "No profile selected. Run ./setup install."
   fi
 
-  info "Repair hints:"
-  item "If mise tools are missing, run: ./setup install --with runtime"
-  item "If Docker is missing, enable Docker Desktop WSL integration or run: ./setup install --docker wsl-engine"
-  item "If zsh is not default, run: chsh -s \$(command -v zsh)"
+  info "Available follow-ups:"
+  item "Runtime tools are handled when Runtime is selected."
+  item "If Docker Desktop is selected and docker is unavailable, enable WSL integration in Docker Desktop."
+  item "To preview changes before rerunning, use: ./setup install --dry-run"
 }

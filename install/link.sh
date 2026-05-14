@@ -7,6 +7,9 @@ source "$DOTFILES_ROOT/lib/common.sh"
 ONLY_MISE=0
 [[ "${1:-}" == "--only-mise" ]] && ONLY_MISE=1
 
+mkdir -p "$DOTFILES_CONFIG_DIR"
+printf "%s\n" "$DOTFILES_ROOT" > "$DOTFILES_CONFIG_DIR/root"
+
 mkdir -p "$HOME/.config/mise"
 link_file "$DOTFILES_ROOT/mise/config.toml" "$HOME/.config/mise/config.toml"
 link_file "$DOTFILES_ROOT/mise/default-tools.toml" "$HOME/.config/mise/default-tools.toml"
