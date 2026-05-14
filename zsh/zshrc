@@ -1,0 +1,7 @@
+export DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+
+for rc in "$DOTFILES"/zsh/rc.d/*.zsh; do
+  [[ -r "$rc" ]] && source "$rc"
+done
+
+unset rc

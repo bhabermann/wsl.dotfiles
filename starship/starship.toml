@@ -1,0 +1,30 @@
+add_newline = false
+
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[>](bold red)"
+
+[directory]
+truncation_length = 4
+truncate_to_repo = false
+
+[git_branch]
+symbol = "git:"
+
+[git_status]
+disabled = false
+
+[nodejs]
+symbol = "node "
+
+[python]
+symbol = "py "
+
+[java]
+symbol = "java "
+
+[dotnet]
+symbol = "dotnet "
+
+[golang]
+symbol = "go "

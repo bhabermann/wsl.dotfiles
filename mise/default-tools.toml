@@ -1,0 +1,13 @@
+[tools]
+node = "lts"
+python = "latest"
+java = "21"
+dotnet = "8"
+go = "latest"
+zoxide = "latest"
+eza = "latest"
+bat = "latest"
+ripgrep = "latest"
+fd = "latest"
+jq = "latest"
+yq = "latest"

@@ -1,0 +1,10 @@
+[user]
+  name = __GIT_NAME__
+  email = __GIT_EMAIL__
+
+[gpg]
+  format = ssh
+
+# Optional WSL/Windows 1Password SSH agent users can uncomment:
+# [core]
+#   sshCommand = ssh.exe

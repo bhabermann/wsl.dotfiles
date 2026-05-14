@@ -1,0 +1,41 @@
+[include]
+  path = ~/.config/git/identity.gitconfig
+
+[core]
+  autocrlf = input
+  editor = code --wait
+
+[init]
+  defaultBranch = main
+
+[fetch]
+  prune = true
+
+[pull]
+  rebase = false
+
+[rebase]
+  autoStash = true
+
+[push]
+  autoSetupRemote = true
+
+[rerere]
+  enabled = true
+
+[alias]
+  co = checkout
+  st = status
+  br = branch
+  ci = commit
+  lg = log --oneline --graph --decorate --all
+  last = log -1 HEAD --stat
+  unstage = reset HEAD --
+  amend = commit --amend
+  undo = reset --soft HEAD~1
+
+[includeIf "gitdir:~/work/src/work/"]
+  path = ~/.config/git/work.gitconfig
+
+[includeIf "gitdir:~/work/src/personal/"]
+  path = ~/.config/git/personal.gitconfig
