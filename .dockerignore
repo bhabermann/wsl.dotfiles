@@ -1,0 +1,7 @@
+.git
+.gitignore
+*.log
+.env
+secrets.env
+local.env
+tmp/
