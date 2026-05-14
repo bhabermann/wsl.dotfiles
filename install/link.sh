@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOTFILES_ROOT="${DOTFILES_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+source "$DOTFILES_ROOT/lib/common.sh"
+
+ONLY_MISE=0
+[[ "${1:-}" == "--only-mise" ]] && ONLY_MISE=1
+
+mkdir -p "$HOME/.config/mise"
+link_file "$DOTFILES_ROOT/mise/config.toml" "$HOME/.config/mise/config.toml"
+link_file "$DOTFILES_ROOT/mise/default-tools.toml" "$HOME/.config/mise/default-tools.toml"
+
+[[ "$ONLY_MISE" == "1" ]] && exit 0
+
+link_file "$DOTFILES_ROOT/zsh/zshrc" "$HOME/.zshrc"
+link_file "$DOTFILES_ROOT/git/gitconfig" "$HOME/.gitconfig"
+link_file "$DOTFILES_ROOT/starship/starship.toml" "$HOME/.config/starship.toml"
+
+copy_template_if_missing "$DOTFILES_ROOT/templates/git/identity.gitconfig.template" "$HOME/.config/git/identity.gitconfig"
+if [[ -n "${GIT_NAME:-}" && -n "${GIT_EMAIL:-}" ]]; then
+  sed -i "s|__GIT_NAME__|$GIT_NAME|g; s|__GIT_EMAIL__|$GIT_EMAIL|g" "$HOME/.config/git/identity.gitconfig"
+fi
+
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
+copy_template_if_missing "$DOTFILES_ROOT/templates/ssh/config.template" "$HOME/.ssh/config"
+chmod 600 "$HOME/.ssh/config" || true
+
+copy_template_if_missing "$DOTFILES_ROOT/templates/dotfiles/local.env.template" "$DOTFILES_CONFIG_DIR/local.env"
+copy_template_if_missing "$DOTFILES_ROOT/templates/dotfiles/profile.template" "$DOTFILES_CONFIG_DIR/profile"

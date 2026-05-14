@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOTFILES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export DOTFILES_ROOT
+
+source "$DOTFILES_ROOT/lib/common.sh"
+source "$DOTFILES_ROOT/lib/tools.sh"
+
+COMMAND="install"
+NON_INTERACTIVE=0
+PROFILE=""
+GIT_NAME=""
+GIT_EMAIL=""
+TOOLS_PRESET="recommended"
+DOCKER_STRATEGY=""
+VERBOSE=0
+LOG_ENABLED=0
+DRY_RUN=0
+NO_DOCTOR=0
+WITH_ITEMS=()
+WITHOUT_ITEMS=()
+
+usage() {
+  cat <<'EOF'
+Usage: ./setup [COMMAND] [OPTIONS]
+
+Commands:
+  install              Install selected dotfiles components (default)
+  verify               Verify the environment
+  doctor               Show human-readable diagnostics
+  update               Re-run selected installation steps
+  uninstall            Print uninstall guidance
+  help                 Show this help
+
+Options:
+  --non-interactive             Do not prompt; require explicit required values
+  --profile work|personal       Select profile
+  --git-name NAME               Git identity name for new identity file
+  --git-email EMAIL             Git identity email for new identity file
+  --tools minimal|recommended|all
+  --with ITEM                   Add a tool or group
+  --without ITEM                Remove a tool or group
+  --docker desktop|wsl-engine|none
+  --dry-run                   Show the installation plan without changing files
+  --no-doctor                 Skip final doctor checks after install/linking
+  --verbose
+  --log
+  -h, --help
+
+Examples:
+  ./setup
+  ./setup install --non-interactive --profile personal --git-name "Test User" --git-email test@example.com
+  ./setup install --tools recommended --with history --docker desktop
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    install|verify|doctor|update|uninstall|help)
+      COMMAND="$1"
+      shift
+      ;;
+    --non-interactive)
+      NON_INTERACTIVE=1
+      shift
+      ;;
+    --profile)
+      PROFILE="${2:-}"
+      shift 2
+      ;;
+    --git-name)
+      GIT_NAME="${2:-}"
+      shift 2
+      ;;
+    --git-email)
+      GIT_EMAIL="${2:-}"
+      shift 2
+      ;;
+    --tools)
+      TOOLS_PRESET="${2:-}"
+      shift 2
+      ;;
+    --with)
+      WITH_ITEMS+=("${2:-}")
+      shift 2
+      ;;
+    --without)
+      WITHOUT_ITEMS+=("${2:-}")
+      shift 2
+      ;;
+    --docker)
+      DOCKER_STRATEGY="${2:-}"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --no-doctor)
+      NO_DOCTOR=1
+      shift
+      ;;
+    --verbose)
+      VERBOSE=1
+      shift
+      ;;
+    --log)
+      LOG_ENABLED=1
+      shift
+      ;;
+    -h|--help)
+      COMMAND="help"
+      shift
+      ;;
+    *)
+      die "Unknown argument: $1"
+      ;;
+  esac
+done
+
+export NON_INTERACTIVE PROFILE GIT_NAME GIT_EMAIL TOOLS_PRESET DOCKER_STRATEGY VERBOSE LOG_ENABLED DRY_RUN NO_DOCTOR
+
+case "$COMMAND" in
+  install)
+    source "$DOTFILES_ROOT/install/install.sh"
+    action_install "${WITH_ITEMS[@]}" -- "${WITHOUT_ITEMS[@]}"
+    ;;
+  update)
+    source "$DOTFILES_ROOT/install/install.sh"
+    action_install "${WITH_ITEMS[@]}" -- "${WITHOUT_ITEMS[@]}"
+    ;;
+  verify)
+    source "$DOTFILES_ROOT/install/verify.sh"
+    action_verify
+    ;;
+  doctor)
+    source "$DOTFILES_ROOT/install/doctor.sh"
+    action_doctor
+    ;;
+  uninstall)
+    source "$DOTFILES_ROOT/install/uninstall.sh"
+    action_uninstall
+    ;;
+  help)
+    usage
+    ;;
+  *)
+    die "Unknown command: $COMMAND"
+    ;;
+esac
