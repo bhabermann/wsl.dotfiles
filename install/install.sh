@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 action_install() {
-  local selected_groups group profile_source identity_status docker_choice default_shell_choice
+  local selected_groups group profile_source identity_status docker_choice default_shell_choice selected_tmp
 
   section "Environment"
   [[ "$DOTFILES_ROOT" == /mnt/* ]] && warn "Recommended: clone dotfiles under the Linux filesystem, not /mnt/c."
@@ -17,14 +17,21 @@ action_install() {
   fi
 
   section "Identity"
-  profile_source="selected"
-  if [[ -z "${PROFILE:-}" && -f "$DOTFILES_CONFIG_DIR/profile" ]]; then
+  profile_source="flag"
+  if [[ "${PROFILE_FLAG:-0}" != "1" && -f "$DOTFILES_CONFIG_DIR/profile" ]]; then
     PROFILE="$(tr -d '[:space:]' < "$DOTFILES_CONFIG_DIR/profile")"
-    profile_source="from $DOTFILES_CONFIG_DIR/profile"
+    profile_source="saved state"
+  elif [[ -z "${PROFILE:-}" ]]; then
+    profile_source="prompt"
   fi
-  if [[ "${NON_INTERACTIVE:-0}" == "0" && -z "$PROFILE" ]]; then
-    read -r -p "Profile [personal/work] (Recommended: personal): " PROFILE
-    PROFILE="${PROFILE:-personal}"
+  if [[ "${NON_INTERACTIVE:-0}" == "0" && ( -z "$PROFILE" || "${RECONFIGURE:-0}" == "1" ) && "${PROFILE_FLAG:-0}" != "1" ]]; then
+    local profile_default="${PROFILE:-personal}"
+    PROFILE="$(prompt_choice "Profile [personal/work] [default: $profile_default]:" "$profile_default")"
+    if [[ "${RECONFIGURE:-0}" == "1" ]]; then
+      profile_source="reconfigure prompt"
+    else
+      profile_source="prompt"
+    fi
   fi
   [[ "$PROFILE" == "personal" || "$PROFILE" == "work" ]] || die "Profile must be personal or work"
   field "Profile" "$PROFILE ($profile_source)"
@@ -38,20 +45,26 @@ action_install() {
   fi
   field "Git identity" "$identity_status"
 
-  mapfile -t selected_groups < <(resolve_tool_selection "$@")
-  default_shell_choice="$(resolve_default_shell)"
+  selected_tmp="$(mktemp)"
+  resolve_tool_selection "$@" > "$selected_tmp"
+  mapfile -t selected_groups < "$selected_tmp"
+  rm -f "$selected_tmp"
+  resolve_default_shell
+  default_shell_choice="$RESOLVED_DEFAULT_SHELL"
 
   section "Installation Plan"
-  field "Profile" "$PROFILE"
+  field "Profile" "$PROFILE ($profile_source)"
+  field "Tool selection" "${TOOL_SELECTION_SOURCE:-unknown}"
   docker_choice="None"
   if has_selected "docker-desktop" "${selected_groups[@]}"; then
     docker_choice="$(docker_strategy_label docker-desktop)"
   elif has_selected "docker-wsl-engine" "${selected_groups[@]}"; then
     docker_choice="$(docker_strategy_label docker-wsl-engine)"
   fi
-  field "Docker" "$docker_choice"
-  field "Default shell" "$default_shell_choice"
+  field "Docker" "$docker_choice (${DOCKER_SELECTION_SOURCE:-unknown})"
+  field "Default shell" "$default_shell_choice (${DEFAULT_SHELL_SOURCE:-unknown})"
   field "Git identity" "$identity_status"
+  field "Dependency setup" "Ubuntu base packages (always installed first)"
   info "Tools:"
   for group in "${selected_groups[@]}"; do
     item "$(tool_label "$group"): $(tool_description "$group")"
@@ -78,17 +91,20 @@ action_install() {
 
   mkdir -p "$DOTFILES_CONFIG_DIR" "$HOME/.config/git"
   printf "%s\n" "$PROFILE" > "$DOTFILES_CONFIG_DIR/profile"
+  printf "%s\n" "${selected_groups[@]}" > "$DOTFILES_CONFIG_DIR/selected-tools"
+  printf "%s\n" "$default_shell_choice" > "$DOTFILES_CONFIG_DIR/default-shell"
 
   section "Installation"
+  install_dependency_setup
   for group in "${selected_groups[@]}"; do
     case "$group" in
-      base) install_base ;;
       shell) install_shell ;;
       modern-cli) install_modern_cli ;;
       runtime) install_runtime ;;
       history) install_history ;;
       docker-desktop) verify_docker_desktop ;;
       docker-wsl-engine) install_docker_wsl_engine ;;
+      corporate-ca) install_corporate_ca ;;
       *) warn "Unknown group skipped: $group" ;;
     esac
   done
@@ -107,22 +123,52 @@ action_install() {
 
 resolve_default_shell() {
   local choice="${DEFAULT_SHELL:-}"
+  local saved_shell=""
+
+  if [[ -n "$choice" ]]; then
+    DEFAULT_SHELL_SOURCE="flag: --default-shell $choice"
+  elif [[ "${DEFAULT_SHELL_FLAG:-0}" != "1" && -f "$DOTFILES_CONFIG_DIR/default-shell" ]]; then
+    saved_shell="$(tr -d '[:space:]' < "$DOTFILES_CONFIG_DIR/default-shell")"
+    choice="$saved_shell"
+    DEFAULT_SHELL_SOURCE="saved state"
+  elif [[ "${DEFAULT_SHELL_FLAG:-0}" != "1" && -f "$DOTFILES_CONFIG_DIR/profile" ]]; then
+    choice="unchanged"
+    DEFAULT_SHELL_SOURCE="saved state default"
+  fi
 
   if [[ -z "$choice" && "${NON_INTERACTIVE:-0}" == "1" ]]; then
     choice="unchanged"
+    DEFAULT_SHELL_SOURCE="non-interactive default"
   fi
 
-  if [[ -z "$choice" ]]; then
+  if [[ "${NON_INTERACTIVE:-0}" == "0" && ( -z "$choice" || "${RECONFIGURE:-0}" == "1" ) && "${DEFAULT_SHELL_FLAG:-0}" != "1" ]]; then
+    local shell_default="${choice:-zsh}"
     section "Default Shell" >&2
     printf "  %s1)%s Set zsh as login shell %s(Recommended)%s\n" "$C_LABEL" "$C_RESET" "$C_OK" "$C_RESET" >&2
     printf "  %s2)%s Leave current shell unchanged\n" "$C_LABEL" "$C_RESET" >&2
-    choice="$(prompt_choice "Select default shell [default: 1]:" "1")"
+    case "$shell_default" in
+      zsh|1) shell_default="1" ;;
+      unchanged|none|no|N|n|2) shell_default="2" ;;
+      *) shell_default="2" ;;
+    esac
+    printf "  Current default: %s\n" "$(default_shell_label "$shell_default")" >&2
+    choice="$(prompt_choice "Select default shell [default: $shell_default]:" "$shell_default")"
+    DEFAULT_SHELL_SOURCE="prompt"
+    [[ "${RECONFIGURE:-0}" == "1" ]] && DEFAULT_SHELL_SOURCE="reconfigure prompt"
   fi
 
   case "$choice" in
+    1|zsh) RESOLVED_DEFAULT_SHELL="zsh" ;;
+    2|unchanged|none|no|N|n) RESOLVED_DEFAULT_SHELL="unchanged" ;;
+    *) die "Unknown default shell choice: $choice" ;;
+  esac
+}
+
+default_shell_label() {
+  case "$1" in
     1|zsh) printf "zsh" ;;
     2|unchanged|none|no|N|n) printf "unchanged" ;;
-    *) die "Unknown default shell choice: $choice" ;;
+    *) printf "%s" "$1" ;;
   esac
 }
 
@@ -160,7 +206,7 @@ action_complete() {
   section "Complete"
   field "Restart shell" "exec zsh"
   field "Preview changes" "./setup install --dry-run"
-  field "Reconfigure tools" "./setup install"
+  field "Reconfigure choices" "./setup install --reconfigure"
   field "Automation example" "./setup install --non-interactive --tools recommended --docker desktop --default-shell zsh"
 }
 
@@ -174,10 +220,10 @@ has_selected() {
   return 1
 }
 
-install_base() {
-  log "Installing base Ubuntu packages"
+install_dependency_setup() {
+  log "Installing dependency setup: Ubuntu base packages"
   if [[ "${DOTFILES_TEST_MODE:-0}" == "1" ]]; then
-    ok "DOTFILES_TEST_MODE: skipped base package installation"
+    ok "DOTFILES_TEST_MODE: skipped dependency package installation"
     return 0
   fi
   require_sudo
@@ -271,6 +317,23 @@ install_history() {
     "$mise_cmd" use -g atuin@latest >/dev/null 2>&1 || true
   else
     die "mise is required to install Atuin, but runtime installation did not provide it."
+  fi
+}
+
+install_corporate_ca() {
+  log "Preparing corporate CA refresh"
+  copy_template_if_missing "$DOTFILES_ROOT/templates/dotfiles/corporate-ca.env.template" "$DOTFILES_CONFIG_DIR/corporate-ca.env"
+  if [[ "${DOTFILES_TEST_MODE:-0}" == "1" ]]; then
+    ok "DOTFILES_TEST_MODE: skipped corporate CA refresh"
+    return 0
+  fi
+  require_sudo
+  sudo apt-get update -y
+  sudo apt-get install -y openssl ca-certificates curl
+  if "$DOTFILES_ROOT/scripts/update-corporate-ca" --config "$DOTFILES_CONFIG_DIR/corporate-ca.env"; then
+    ok "Corporate CA refresh completed"
+  else
+    warn "Corporate CA refresh did not complete. Configure $DOTFILES_CONFIG_DIR/corporate-ca.env and retry: $DOTFILES_ROOT/scripts/update-corporate-ca --config $DOTFILES_CONFIG_DIR/corporate-ca.env"
   fi
 }
 

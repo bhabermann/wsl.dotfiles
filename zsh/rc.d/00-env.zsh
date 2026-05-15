@@ -1,6 +1,5 @@
 export LANG="${LANG:-en_US.UTF-8}"
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
-export WORKDIR="${WORKDIR:-$HOME/work}"
 export EDITOR="${EDITOR:-code}"
 export VISUAL="${VISUAL:-code}"
 export PAGER="${PAGER:-less -FRX}"

@@ -41,6 +41,7 @@ Useful install options:
 ```bash
 ./setup install --dry-run
 ./setup install --no-doctor
+./setup install --reconfigure
 ```
 
 `--dry-run` shows the environment, identity, tool choices, Docker strategy, and
@@ -49,6 +50,19 @@ installation plan without creating files, links, backups, or installing tools.
 Interactive mode asks whether zsh should become the login shell. In
 non-interactive mode, the login shell is left unchanged unless
 `--default-shell zsh` is provided.
+Every real install first bootstraps the Ubuntu packages that later setup steps
+assume are present: `build-essential`, `curl`, `wget`, `git`,
+`ca-certificates`, `gnupg`, `jq`, `unzip`, `zip`, `locales`, and
+`software-properties-common`. This dependency setup is shown in the
+installation plan, but it is not a selectable or persisted tool group.
+After a real install, setup saves the selected profile, tool groups, Docker
+strategy, and default-shell choice under `~/.config/dotfiles/`. Plain reruns
+reuse those choices and skip onboarding prompts, then show the final
+installation confirmation in interactive mode. Use `--reconfigure` to edit the
+saved choices; each prompt shows the saved value as the default, so pressing
+Enter keeps the current selection. Explicit flags such as `--profile`,
+`--tools`, `--with`, `--without`, `--docker`, and `--default-shell` override the
+saved baseline for that run and are persisted after a real install.
 
 ## Interactive Tool Selection
 
@@ -56,8 +70,9 @@ The installer asks which groups to install. Each prompt includes a yes/no
 choice, a recommendation tag when applicable, and a short explanation.
 The interactive flow is grouped into sections: Environment, Identity, Tool
 Selection, Docker, Installation Plan, Installation, Linking, and Doctor.
-On reruns, existing local profile and Git identity are shown and preserved
-instead of being requested again.
+On reruns, existing local setup choices and Git identity are shown and
+preserved instead of being requested again. `./setup install --reconfigure`
+asks the setup questions again with saved values preselected.
 
 Example:
 
@@ -68,7 +83,6 @@ Example:
 
 Recommended groups:
 
-- `base`: Ubuntu essentials.
 - `shell`: zsh, prompt, navigation, fuzzy search, and plugins.
 - `modern-cli`: faster search/listing/readability tools.
 - `runtime`: mise-managed language runtimes.
@@ -76,6 +90,7 @@ Recommended groups:
 Optional groups:
 
 - `history`: Atuin.
+- `corporate-ca`: work-profile follow-up for corporate TLS interception CAs.
 
 Docker is selected with one strategy prompt:
 
@@ -97,11 +112,36 @@ Machine-local files:
 
 - `~/.config/dotfiles/profile`
 - `~/.config/dotfiles/local.env`
+- `~/.config/dotfiles/selected-tools`
+- `~/.config/dotfiles/default-shell`
+- `~/.config/dotfiles/corporate-ca.env`
 - `~/.config/dotfiles/secrets.env`
 - `~/.config/git/identity.gitconfig`
 - `~/.ssh/config`
 
 The installer creates local files only when missing.
+
+## When Corporate CA Is Needed
+
+Some corporate networks intercept TLS and present a company-controlled CA. If
+tools such as `curl`, `git`, `mise`, `npm`, package installers, or Docker setup
+fail with certificate verification errors on the work network, opt in explicitly:
+
+```bash
+./setup install --profile work --with corporate-ca
+```
+
+The installer copies
+`templates/dotfiles/corporate-ca.env.template` to
+`~/.config/dotfiles/corporate-ca.env` when missing. Put local hostnames, test
+URLs, and the subject/issuer allowlist regex there. The repository intentionally
+does not include company-specific hosts or certificate authority names.
+
+Preview the refresh without changing system trust:
+
+```bash
+./scripts/update-corporate-ca --config ~/.config/dotfiles/corporate-ca.env --dry-run
+```
 
 ## Windows Bootstrap
 

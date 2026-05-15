@@ -1,43 +1,75 @@
 #!/usr/bin/env bash
 
-ALL_GROUPS=(base shell runtime history modern-cli)
-INSTALL_ORDER=(base runtime shell history modern-cli docker-desktop docker-wsl-engine)
-RECOMMENDED_GROUPS=(base shell runtime modern-cli)
-MINIMAL_GROUPS=(base shell)
+ALL_GROUPS=(shell runtime history modern-cli)
+INSTALL_ORDER=(runtime shell history modern-cli docker-desktop docker-wsl-engine corporate-ca)
+RECOMMENDED_GROUPS=(shell runtime modern-cli)
+MINIMAL_GROUPS=(shell)
 
 tool_description() {
   case "$1" in
-    base) printf "Ubuntu essentials for compiling, downloads, certificates, archives, locale, and JSON handling." ;;
     shell) printf "zsh, Starship, zoxide, fzf, and pinned plugins for a fast interactive shell." ;;
     modern-cli) printf "Faster search, file listing, readable output, YAML/JSON tools, and tmux sessions." ;;
     runtime) printf "mise-managed Node, Python, Java, .NET, and Go runtimes." ;;
     history) printf "Atuin enhanced searchable shell history." ;;
     docker-desktop) printf "Verify Windows Docker Desktop integration with this WSL distro." ;;
     docker-wsl-engine) printf "Install Docker Engine inside WSL with systemd and Windows wrappers." ;;
+    corporate-ca) printf "Refresh configured corporate TLS interception CA certificates into Linux trust." ;;
     *) printf "Custom tool or group." ;;
   esac
 }
 
 tool_label() {
   case "$1" in
-    base) printf "Base" ;;
     shell) printf "Shell" ;;
     modern-cli) printf "Modern CLI" ;;
     runtime) printf "Runtime" ;;
     history) printf "History" ;;
     docker-desktop) printf "Docker Desktop" ;;
     docker-wsl-engine) printf "WSL Docker" ;;
+    corporate-ca) printf "Corporate CA" ;;
     *) printf "%s" "$1" ;;
   esac
 }
 
 docker_strategy_label() {
   case "$1" in
-    docker-desktop|desktop) printf "Docker Desktop" ;;
-    docker-wsl-engine|wsl-engine) printf "WSL Docker Engine" ;;
-    none|"") printf "None" ;;
+    docker-desktop|desktop|1) printf "Docker Desktop" ;;
+    docker-wsl-engine|wsl-engine|2) printf "WSL Docker Engine" ;;
+    none|3|"") printf "None" ;;
     *) printf "%s" "$1" ;;
   esac
+}
+
+docker_strategy_from_groups() {
+  local group
+  for group in "$@"; do
+    case "$group" in
+      docker-desktop) printf "desktop"; return 0 ;;
+      docker-wsl-engine) printf "wsl-engine"; return 0 ;;
+    esac
+  done
+  printf "none"
+}
+
+docker_strategy_prompt_default() {
+  case "$1" in
+    desktop|docker-desktop|"") printf "1" ;;
+    wsl-engine|docker-wsl-engine) printf "2" ;;
+    none) printf "3" ;;
+    *) printf "1" ;;
+  esac
+}
+
+selection_source_with_overrides() {
+  local source="$1"
+  if [[ "$#" -gt 1 ]]; then
+    shift
+    if [[ "$#" -gt 0 ]]; then
+      printf "%s + flags" "$source"
+      return 0
+    fi
+  fi
+  printf "%s" "$source"
 }
 
 is_recommended_group() {
@@ -69,14 +101,17 @@ selected_from_preset() {
 }
 
 prompt_docker_strategy() {
-  local choice
+  local default_choice="${1:-1}"
+  local choice default_label
+  default_label="$(docker_strategy_label "$default_choice")"
   {
     section "Docker"
     printf "  %s1)%s Docker Desktop %s(Recommended)%s - verify Windows Docker Desktop WSL integration.\n" "$C_LABEL" "$C_RESET" "$C_OK" "$C_RESET"
     printf "  %s2)%s WSL Docker Engine - install Docker inside WSL.\n" "$C_LABEL" "$C_RESET"
     printf "  %s3)%s None - skip Docker setup.\n" "$C_LABEL" "$C_RESET"
+    printf "  Current default: %s\n" "$default_label"
   } >&2
-  choice="$(prompt_choice "Select Docker strategy [default: 1]:" "1")"
+  choice="$(prompt_choice "Select Docker strategy [default: $default_choice]:" "$default_choice")"
   case "$choice" in
     1|desktop|DockerDesktop|docker-desktop) printf "desktop" ;;
     2|wsl|wsl-engine|docker-wsl-engine) printf "wsl-engine" ;;
@@ -86,13 +121,13 @@ prompt_docker_strategy() {
 }
 
 resolve_tool_selection() {
-  local selected_file final_file ordered_file group without_base parsing_without arg docker_strategy
+  local selected_file final_file ordered_file group parsing_without arg docker_strategy baseline_source
+  local saved_groups=()
   local with_items=()
   local without_items=()
   selected_file="$(mktemp)"
   final_file="$(mktemp)"
   ordered_file="$(mktemp)"
-  without_base=0
   parsing_without=0
 
   for arg in "$@"; do
@@ -107,34 +142,79 @@ resolve_tool_selection() {
     fi
   done
 
-  selected_from_preset > "$selected_file"
+  if [[ "${TOOLS_FLAG:-0}" != "1" && -f "$DOTFILES_CONFIG_DIR/selected-tools" ]]; then
+    grep -E '^[A-Za-z0-9_-]+$' "$DOTFILES_CONFIG_DIR/selected-tools" | grep -vx "base" > "$selected_file" || true
+    baseline_source="saved state"
+  else
+    selected_from_preset > "$selected_file"
+    if [[ "${TOOLS_FLAG:-0}" == "1" ]]; then
+      baseline_source="flag: --tools ${TOOLS_PRESET:-recommended}"
+    else
+      baseline_source="default preset"
+    fi
+  fi
+  mapfile -t saved_groups < "$selected_file"
 
   docker_strategy="${DOCKER_STRATEGY:-}"
-  if [[ "${NON_INTERACTIVE:-0}" == "1" && -z "$docker_strategy" ]]; then
+  if [[ -n "$docker_strategy" ]]; then
+    DOCKER_SELECTION_SOURCE="flag: --docker $docker_strategy"
+  elif [[ "${DOCKER_FLAG:-0}" != "1" && -f "$DOTFILES_CONFIG_DIR/selected-tools" ]]; then
+    docker_strategy="$(docker_strategy_from_groups "${saved_groups[@]}")"
+    DOCKER_SELECTION_SOURCE="saved state"
+  elif [[ "${NON_INTERACTIVE:-0}" == "1" && -z "$docker_strategy" ]]; then
     case "${TOOLS_PRESET:-recommended}" in
       recommended|preset|all) docker_strategy="desktop" ;;
       minimal) docker_strategy="none" ;;
     esac
+    DOCKER_SELECTION_SOURCE="default for ${TOOLS_PRESET:-recommended}"
   fi
 
   for group in "${with_items[@]}"; do
-    [[ -n "$group" ]] && printf "%s\n" "$group" >> "$selected_file"
+    [[ -n "$group" ]] || continue
+    if [[ "$group" == "base" ]]; then
+      warn "Ignoring legacy --with base; dependency setup is always run first."
+      continue
+    fi
+    printf "%s\n" "$group" >> "$selected_file"
   done
 
   sort -u "$selected_file" > "$final_file"
-  if [[ "${NON_INTERACTIVE:-0}" == "0" ]]; then
+  TOOL_SELECTION_SOURCE="$(selection_source_with_overrides "$baseline_source" "${with_items[@]}" "${without_items[@]}")"
+
+  if [[ "${NON_INTERACTIVE:-0}" == "0" && ( "${RECONFIGURE:-0}" == "1" || ! -f "$DOTFILES_CONFIG_DIR/selected-tools" || "${TOOLS_FLAG:-0}" == "1" ) ]]; then
     section "Tool Selection" >&2
     : > "$final_file"
     for group in "${ALL_GROUPS[@]}"; do
       local default="N"
-      is_recommended_group "$group" && default="Y"
+      if grep -qx "$group" "$selected_file"; then
+        default="Y"
+      elif [[ "$baseline_source" == "default preset" ]] && is_recommended_group "$group"; then
+        default="Y"
+      fi
       local recommended="0"
       is_recommended_group "$group" && recommended="1"
       if confirm_aligned "$(tool_label "$group")" "$(tool_description "$group")" "$default" "$recommended"; then
         printf "%s\n" "$group" >> "$final_file"
       fi
     done
-    docker_strategy="$(prompt_docker_strategy)"
+    if [[ "${PROFILE:-}" == "work" ]]; then
+      section "Work Follow-ups" >&2
+      local ca_default="N"
+      grep -qx "corporate-ca" "$selected_file" && ca_default="Y"
+      if confirm_aligned "$(tool_label corporate-ca)" "$(tool_description corporate-ca)" "$ca_default" "0"; then
+        printf "%s\n" "corporate-ca" >> "$final_file"
+      fi
+    fi
+    TOOL_SELECTION_SOURCE="prompts"
+    [[ "${RECONFIGURE:-0}" == "1" ]] && TOOL_SELECTION_SOURCE="reconfigure prompts"
+  fi
+
+  if [[ -z "$docker_strategy" || ( "${NON_INTERACTIVE:-0}" == "0" && ( "${RECONFIGURE:-0}" == "1" || ! -f "$DOTFILES_CONFIG_DIR/selected-tools" || "${DOCKER_FLAG:-0}" == "1" ) && "${DOCKER_FLAG:-0}" != "1" ) ]]; then
+    local docker_default
+    docker_default="$(docker_strategy_prompt_default "$docker_strategy")"
+    docker_strategy="$(prompt_docker_strategy "$docker_default")"
+    DOCKER_SELECTION_SOURCE="prompts"
+    [[ "${RECONFIGURE:-0}" == "1" ]] && DOCKER_SELECTION_SOURCE="reconfigure prompts"
   fi
 
   if [[ -n "$docker_strategy" ]]; then
@@ -149,21 +229,16 @@ resolve_tool_selection() {
 
   for group in "${without_items[@]}"; do
     [[ -n "$group" ]] || continue
-    [[ "$group" == "base" ]] && without_base=1
+    if [[ "$group" == "base" ]]; then
+      warn "Ignoring legacy --without base; dependency setup is always run first."
+      continue
+    fi
     sed -i "/^${group}$/d" "$final_file"
   done
 
   for group in "${with_items[@]}"; do
-    [[ -n "$group" ]] && printf "%s\n" "$group" >> "$final_file"
+    [[ -n "$group" && "$group" != "base" ]] && printf "%s\n" "$group" >> "$final_file"
   done
-
-  if ! grep -qx "base" "$final_file"; then
-    if [[ "$without_base" == "1" ]]; then
-      warn "base group disabled by explicit selection"
-    else
-      printf "base\n" >> "$final_file"
-    fi
-  fi
 
   if grep -qx "history" "$final_file" && ! grep -qx "runtime" "$final_file"; then
     warn "history selected; runtime will be installed because Atuin requires mise."
