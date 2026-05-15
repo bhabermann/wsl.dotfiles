@@ -25,8 +25,8 @@
 | Group | Default | Purpose |
 | --- | --- | --- |
 | shell | recommended | zsh, Starship, zoxide, fzf, completions, suggestions, and highlighting |
-| modern-cli | recommended | ripgrep, fd, bat, eza, jq, yq, tree, and tmux |
-| runtime | recommended | mise-managed Node, Python, Java, .NET, and Go |
+| modern-cli | recommended | apt-installed ripgrep, fd, bat, eza, jq, yq, gh, tree, and tmux |
+| runtime | recommended | mise-managed global Node, Python, Java, .NET, and Go |
 | history | optional | Atuin searchable shell history |
 | corporate-ca | explicit work opt-in | Capture configured corporate TLS interception CA chains and install only allowlisted CA certificates |
 
@@ -35,6 +35,11 @@ essentials for compiling, downloads, certificates, archives, locale, and JSON
 handling. Dry-runs show this step in the plan without installing packages or
 writing state. Legacy saved `selected-tools` entries and `--with/--without
 base` flags are accepted as no-ops and are not persisted.
+
+Ubuntu apt owns WSL system tools and general CLIs. mise is reserved for global
+developer language runtimes and project version switching for `node`, `python`,
+`java`, `dotnet`, and `go`. Atuin is the only optional non-language mise
+exception because it is not available through standard Ubuntu 24.04 apt sources.
 
 Docker is not a tool group prompt. It is one mutually exclusive strategy:
 

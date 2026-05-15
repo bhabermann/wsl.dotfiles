@@ -84,13 +84,27 @@ Example:
 Recommended groups:
 
 - `shell`: zsh, prompt, navigation, fuzzy search, and plugins.
-- `modern-cli`: faster search/listing/readability tools.
-- `runtime`: mise-managed language runtimes.
+- `modern-cli`: apt-installed search/listing/readability tools, GitHub CLI, YAML/JSON tools, and tmux.
+- `runtime`: mise-managed global language runtimes.
 
 Optional groups:
 
 - `history`: Atuin.
 - `corporate-ca`: work-profile follow-up for corporate TLS interception CAs.
+
+## Package Policy
+
+Ubuntu apt owns WSL system tools and general CLIs. That includes `zsh`, `fzf`,
+`direnv`, `zoxide`, `ripgrep`, `fd-find`, `bat`, `tree`, `tmux`, `jq`, `gh`,
+`eza`, and `yq`.
+
+mise owns globally available developer language runtimes and project version
+switching for `node`, `python`, `java`, `dotnet`, and `go`. The installer links
+the global mise config into `~/.config/mise/`, keeps `~/.local/bin` and
+`~/.local/share/mise/shims` on `PATH`, and activates mise from zsh.
+
+Atuin is the only optional non-language mise exception because it is not
+available through standard Ubuntu 24.04 apt sources.
 
 Docker is selected with one strategy prompt:
 

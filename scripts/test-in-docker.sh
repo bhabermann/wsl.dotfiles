@@ -11,6 +11,18 @@ echo "==> help"
 grep -q "Usage: ./setup" /tmp/setup-help.txt
 grep -q -- "--reconfigure" /tmp/setup-help.txt
 
+echo "==> package policy"
+grep -q "apt-get install -y ripgrep fd-find bat tree tmux jq gh eza yq" install/install.sh
+! grep -Eq 'mise use -g .*eza' install/install.sh
+! grep -Eq 'mise use -g .*yq' install/install.sh
+grep -q 'node = "lts"' mise/default-tools.toml
+grep -q 'python = "latest"' mise/default-tools.toml
+grep -q 'java = "21"' mise/default-tools.toml
+grep -q 'dotnet = "8"' mise/default-tools.toml
+grep -q 'go = "latest"' mise/default-tools.toml
+! grep -Eq '^(zoxide|eza|bat|ripgrep|fd|jq|yq) =' mise/default-tools.toml
+! grep -Eq '^(atuin|eza|yq) =' mise/config.toml
+
 echo "==> tool selection parser"
 actual="$(mktemp)"
 expected="$(mktemp)"
