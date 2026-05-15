@@ -33,6 +33,14 @@ action_verify() {
 
   if selected_tool modern-cli; then
     check_cmd rg || true
+    check_cmd fdfind || true
+    check_cmd batcat || true
+    check_cmd tree || true
+    check_cmd tmux || true
+    check_cmd jq || true
+    check_cmd gh || true
+    check_cmd eza || true
+    check_cmd yq || true
   else
     warn "modern CLI tools not checked; modern-cli group was not selected"
   fi

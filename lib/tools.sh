@@ -8,8 +8,8 @@ MINIMAL_GROUPS=(shell)
 tool_description() {
   case "$1" in
     shell) printf "zsh, Starship, zoxide, fzf, and pinned plugins for a fast interactive shell." ;;
-    modern-cli) printf "Faster search, file listing, readable output, YAML/JSON tools, and tmux sessions." ;;
-    runtime) printf "mise-managed Node, Python, Java, .NET, and Go runtimes." ;;
+    modern-cli) printf "Apt-installed search, file listing, readable output, YAML/JSON, GitHub CLI, and tmux tools." ;;
+    runtime) printf "mise-managed global Node, Python, Java, .NET, and Go runtimes." ;;
     history) printf "Atuin enhanced searchable shell history." ;;
     docker-desktop) printf "Verify Windows Docker Desktop integration with this WSL distro." ;;
     docker-wsl-engine) printf "Install Docker Engine inside WSL with systemd and Windows wrappers." ;;

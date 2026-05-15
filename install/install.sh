@@ -72,9 +72,6 @@ action_install() {
   if has_selected "history" "${selected_groups[@]}" && has_selected "runtime" "${selected_groups[@]}"; then
     hint "Dependency note: history uses Atuin through mise, so runtime must be installed."
   fi
-  if has_selected "modern-cli" "${selected_groups[@]}" && ! has_selected "runtime" "${selected_groups[@]}"; then
-    warn "modern-cli selected without runtime; apt-backed tools will install, mise-backed extras like eza/yq will be skipped."
-  fi
   [[ -f "$HOME/.ssh/config" ]] && hint "Preserved: existing SSH config at $HOME/.ssh/config"
   [[ -f "$HOME/.config/git/identity.gitconfig" ]] && hint "Preserved: existing Git identity at $HOME/.config/git/identity.gitconfig"
 
@@ -277,10 +274,7 @@ install_modern_cli() {
     return 0
   fi
   require_sudo
-  sudo apt-get install -y ripgrep fd-find bat tree tmux jq
-  if need_cmd mise; then
-    mise use -g eza@latest yq@latest >/dev/null 2>&1 || true
-  fi
+  sudo apt-get install -y ripgrep fd-find bat tree tmux jq gh eza yq
 }
 
 install_runtime() {
@@ -300,7 +294,7 @@ install_runtime() {
   [[ -z "$mise_cmd" && -x "$HOME/.local/bin/mise" ]] && mise_cmd="$HOME/.local/bin/mise"
   if [[ -n "$mise_cmd" ]]; then
     "$mise_cmd" trust "$DOTFILES_ROOT" >/dev/null 2>&1 || true
-    "$mise_cmd" install || true
+    "$mise_cmd" install -C "$HOME" || true
   fi
 }
 
