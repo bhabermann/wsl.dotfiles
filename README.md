@@ -8,7 +8,7 @@ secrets, and overrides outside the repository.
 ## Quick Start
 
 ```bash
-git clone <repo-url> ~/.dotfiles
+git clone https://github.com/bhabermann/wsl.dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
 ./setup install
 ```
@@ -212,3 +212,12 @@ The pipeline builds `Dockerfile.test` with Ubuntu 24.04 and runs:
 `DOTFILES_TEST_MODE=1` skips package downloads, external installers, Docker Engine
 changes, and Windows/WSL integration checks so the container can validate behavior
 without mutating the host or depending on Windows APIs.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the repository policy and validation
+checks.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
