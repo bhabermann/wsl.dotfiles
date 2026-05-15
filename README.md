@@ -1,4 +1,4 @@
-# habermann.dotfiles
+# wsl.dotfiles
 
 Public-safe dotfiles for Ubuntu 24.04 on WSL2 running on Windows 11.
 
@@ -44,25 +44,34 @@ Useful install options:
 ./setup install --reconfigure
 ```
 
-`--dry-run` shows the environment, identity, tool choices, Docker strategy, and
-installation plan without creating files, links, backups, or installing tools.
-`--no-doctor` skips the final doctor checks after a normal install.
-Interactive mode asks whether zsh should become the login shell. In
-non-interactive mode, the login shell is left unchanged unless
-`--default-shell zsh` is provided.
+- `--dry-run` previews the environment, identity, tool choices, Docker strategy,
+  and installation plan without creating files, links, backups, or installing
+  tools.
+- `--no-doctor` skips the final doctor checks after a normal install.
+- `--default-shell zsh` sets zsh as the login shell. Interactive installs ask
+  before changing the login shell; non-interactive installs leave it unchanged
+  unless this option is provided.
+- `--reconfigure` edits saved setup choices. Prompts show the saved value as the
+  default, so pressing Enter keeps the current selection.
+
 Every real install first bootstraps the Ubuntu packages that later setup steps
-assume are present: `build-essential`, `curl`, `wget`, `git`,
-`ca-certificates`, `gnupg`, `jq`, `unzip`, `zip`, `locales`, and
-`software-properties-common`. This dependency setup is shown in the
-installation plan, but it is not a selectable or persisted tool group.
+assume are present:
+
+```text
+build-essential curl wget git ca-certificates gnupg jq unzip zip locales software-properties-common
+```
+
+Dependency setup appears in the installation plan, but it is not a selectable
+or persisted tool group.
+
 After a real install, setup saves the selected profile, tool groups, Docker
 strategy, and default-shell choice under `~/.config/dotfiles/`. Plain reruns
 reuse those choices and skip onboarding prompts, then show the final
-installation confirmation in interactive mode. Use `--reconfigure` to edit the
-saved choices; each prompt shows the saved value as the default, so pressing
-Enter keeps the current selection. Explicit flags such as `--profile`,
-`--tools`, `--with`, `--without`, `--docker`, and `--default-shell` override the
-saved baseline for that run and are persisted after a real install.
+installation confirmation in interactive mode.
+
+Explicit flags such as `--profile`, `--tools`, `--with`, `--without`,
+`--docker`, and `--default-shell` override the saved baseline for that run and
+are persisted after a real install.
 
 ## Interactive Tool Selection
 
