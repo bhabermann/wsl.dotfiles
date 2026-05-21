@@ -15,6 +15,8 @@ echo "==> package policy"
 grep -q "apt-get install -y ripgrep fd-find bat tree tmux jq gh eza yq" install/install.sh
 ! grep -Eq 'mise use -g .*eza' install/install.sh
 ! grep -Eq 'mise use -g .*yq' install/install.sh
+grep -q 'default_tools_file="\$DOTFILES_ROOT/mise/default-tools.toml"' install/install.sh
+grep -q '"\$mise_cmd" use -g "\$tool@\$version"' install/install.sh
 grep -q 'node = "lts"' mise/default-tools.toml
 grep -q 'python = "latest"' mise/default-tools.toml
 grep -q 'java = "21"' mise/default-tools.toml
@@ -22,6 +24,48 @@ grep -q 'dotnet = "8"' mise/default-tools.toml
 grep -q 'go = "latest"' mise/default-tools.toml
 ! grep -Eq '^(zoxide|eza|bat|ripgrep|fd|jq|yq) =' mise/default-tools.toml
 ! grep -Eq '^(atuin|eza|yq) =' mise/config.toml
+
+echo "==> runtime config parser"
+bash -lc '
+  set -euo pipefail
+  DOTFILES_ROOT=/workspace
+  source /workspace/lib/common.sh
+  source /workspace/install/install.sh
+  valid="$(mktemp)"
+  cat > "$valid" <<'\''EOF'\''
+[tools]
+node = "lts"
+python = "latest"
+EOF
+  actual="$(read_mise_default_tools "$valid")"
+  expected="$(printf "node\tlts\npython\tlatest\n")"
+  test "$actual" = "$expected"
+'
+
+if bash -lc '
+  set -euo pipefail
+  DOTFILES_ROOT=/workspace
+  source /workspace/lib/common.sh
+  source /workspace/install/install.sh
+  malformed="$(mktemp)"
+  cat > "$malformed" <<'\''EOF'\''
+[tools]
+node = lts
+EOF
+  read_mise_default_tools "$malformed" >/tmp/mise-parse-malformed.txt 2>&1
+'; then
+  exit 1
+fi
+
+if bash -lc '
+  set -euo pipefail
+  DOTFILES_ROOT=/workspace
+  source /workspace/lib/common.sh
+  source /workspace/install/install.sh
+  read_mise_default_tools /tmp/mise-does-not-exist.toml >/tmp/mise-parse-missing.txt 2>&1
+'; then
+  exit 1
+fi
 
 echo "==> tool selection parser"
 actual="$(mktemp)"

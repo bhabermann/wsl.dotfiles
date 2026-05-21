@@ -292,10 +292,99 @@ install_runtime() {
   local mise_cmd
   mise_cmd="$(command -v mise || true)"
   [[ -z "$mise_cmd" && -x "$HOME/.local/bin/mise" ]] && mise_cmd="$HOME/.local/bin/mise"
-  if [[ -n "$mise_cmd" ]]; then
-    "$mise_cmd" trust "$DOTFILES_ROOT" >/dev/null 2>&1 || true
-    "$mise_cmd" install -C "$HOME" || true
+  [[ -n "$mise_cmd" ]] || die "mise installation did not provide a usable binary."
+  "$mise_cmd" trust "$DOTFILES_ROOT" >/dev/null 2>&1 || true
+
+  local default_tools_file runtime_pairs pair tool version
+  default_tools_file="$DOTFILES_ROOT/mise/default-tools.toml"
+  mapfile -t runtime_pairs < <(read_mise_default_tools "$default_tools_file")
+  for pair in "${runtime_pairs[@]}"; do
+    tool="${pair%%$'\t'*}"
+    version="${pair#*$'\t'}"
+    "$mise_cmd" use -g "$tool@$version"
+  done
+  "$mise_cmd" install
+}
+
+read_mise_default_tools() {
+  local config_file="$1"
+  [[ -f "$config_file" ]] || die "Missing runtime config: $config_file"
+
+  local awk_output awk_status
+  if awk_output="$(awk '
+    BEGIN {
+      in_tools = 0
+      count = 0
+      malformed = 0
+    }
+    function trim(s) {
+      gsub(/^[ \t]+|[ \t]+$/, "", s)
+      return s
+    }
+    {
+      line = $0
+      sub(/[ \t]*#.*/, "", line)
+      line = trim(line)
+      if (line == "") {
+        next
+      }
+      if (line ~ /^\[[^]]+\]$/) {
+        in_tools = (line == "[tools]")
+        next
+      }
+      if (in_tools) {
+        eq = index(line, "=")
+        if (eq > 1) {
+          key = trim(substr(line, 1, eq - 1))
+          value = trim(substr(line, eq + 1))
+          if (key ~ /^[A-Za-z0-9._-]+$/ && value ~ /^"[^"]+"$/) {
+            sub(/^"/, "", value)
+            sub(/"$/, "", value)
+            print key "\t" value
+            count++
+            next
+          }
+        }
+        if (line ~ /^[A-Za-z0-9._-]+[ \t]*=[ \t]*"[^"]+"[ \t]*$/) {
+          key = line
+          sub(/[ \t]*=.*/, "", key)
+          value = line
+          sub(/^[^=]*=[ \t]*"/, "", value)
+          sub(/"[ \t]*$/, "", value)
+          print key "\t" value
+          count++
+          next
+        }
+        printf "Malformed runtime entry at line %d in %s: %s\n", NR, FILENAME, $0 > "/dev/stderr"
+        malformed = 1
+        exit 2
+      }
+    }
+    END {
+      if (malformed) {
+        exit 2
+      }
+      if (count == 0) {
+        exit 3
+      }
+    }
+  ' "$config_file")"; then
+    awk_status=0
+  else
+    awk_status=$?
   fi
+
+  if [[ "$awk_status" -eq 2 ]]; then
+    die "Runtime config is malformed: $config_file"
+  fi
+  if [[ "$awk_status" -eq 3 ]]; then
+    die "Runtime config has no [tools] entries: $config_file"
+  fi
+  if [[ "$awk_status" -ne 0 ]]; then
+    die "Failed to parse runtime config: $config_file"
+  fi
+
+  printf "%s\n" "$awk_output"
 }
 
 install_history() {
