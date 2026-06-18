@@ -4,7 +4,7 @@ set -euo pipefail
 cd /workspace
 
 echo "==> bash syntax"
-bash -n setup lib/common.sh lib/tools.sh install/*.sh scripts/*.sh scripts/update-corporate-ca
+bash -n setup lib/common.sh lib/tools.sh install/*.sh scripts/*.sh scripts/wslview scripts/update-corporate-ca
 
 echo "==> help"
 ./setup help >/tmp/setup-help.txt
@@ -12,7 +12,21 @@ grep -q "Usage: ./setup" /tmp/setup-help.txt
 grep -q -- "--reconfigure" /tmp/setup-help.txt
 
 echo "==> package policy"
+grep -q "apt-get install -y zsh fzf direnv starship zoxide zsh-autosuggestions zsh-syntax-highlighting" install/install.sh
 grep -q "apt-get install -y ripgrep fd-find bat tree tmux jq gh eza yq" install/install.sh
+grep -q "apt-get install -y atuin" install/install.sh
+grep -q "add-apt-repository -y ppa:jdxcode/mise" install/install.sh
+grep -q "apt-get install -y mise" install/install.sh
+grep -q "libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata" install/install.sh
+grep -q "bash-completion util-linux-extra" install/install.sh
+grep -q "newgrp docker" scripts/test-docker.sh
+! grep -q "sg docker" scripts/test-docker.sh
+grep -q 'exec dotnet@8 -- dotnet --version' install/install.sh
+! grep -q "https://mise.run" install/install.sh
+! grep -q "starship/releases" install/install.sh
+! grep -q "zsh-autosuggestions" install/plugins.sh
+! grep -q "zsh-syntax-highlighting" install/plugins.sh
+grep -q "zsh-completions" install/plugins.sh
 ! grep -Eq 'mise use -g .*eza' install/install.sh
 ! grep -Eq 'mise use -g .*yq' install/install.sh
 grep -q 'default_tools_file="\$DOTFILES_ROOT/mise/default-tools.toml"' install/install.sh
@@ -24,6 +38,23 @@ grep -q 'dotnet = "8"' mise/default-tools.toml
 grep -q 'go = "latest"' mise/default-tools.toml
 ! grep -Eq '^(zoxide|eza|bat|ripgrep|fd|jq|yq) =' mise/default-tools.toml
 ! grep -Eq '^(atuin|eza|yq) =' mise/config.toml
+
+echo "==> optional badge"
+printf '\n' | NO_COLOR=1 bash -lc 'source /workspace/lib/common.sh; NON_INTERACTIVE=0; confirm_aligned History "Atuin enhanced searchable shell history." N optional' >/tmp/optional-badge.txt 2>&1 || true
+grep -q "(Optional).*Atuin" /tmp/optional-badge.txt
+
+echo "==> Windows browser bridge"
+browser_tmp="$(mktemp -d)"
+cat > "$browser_tmp/explorer-mock" <<'EOF'
+#!/usr/bin/env bash
+printf "%s\n" "$@" > /tmp/wslview-target.txt
+EOF
+chmod +x "$browser_tmp/explorer-mock"
+WSLVIEW_EXPLORER="$browser_tmp/explorer-mock" ./scripts/wslview 'https://example.com/path?a=1&b=2'
+grep -Fxq 'https://example.com/path?a=1&b=2' /tmp/wslview-target.txt
+if WSLVIEW_EXPLORER="$browser_tmp/explorer-mock" ./scripts/wslview relative-missing-path >/dev/null 2>&1; then
+  exit 1
+fi
 
 echo "==> runtime config parser"
 bash -lc '
@@ -79,10 +110,14 @@ printf "%s\n" runtime shell modern-cli > "$expected"
 diff -u "$expected" "$actual"
 
 bash -lc 'source /workspace/lib/common.sh; source /workspace/lib/tools.sh; NON_INTERACTIVE=1 TOOLS_PRESET=minimal DOCKER_STRATEGY=none resolve_tool_selection history --' > "$actual"
-printf "%s\n" runtime shell history > "$expected"
+printf "%s\n" shell history > "$expected"
 diff -u "$expected" "$actual"
 
 bash -lc 'source /workspace/lib/common.sh; source /workspace/lib/tools.sh; NON_INTERACTIVE=1 TOOLS_PRESET=recommended DOCKER_STRATEGY=wsl-engine resolve_tool_selection --' > "$actual"
+printf "%s\n" runtime shell modern-cli docker-wsl-engine > "$expected"
+diff -u "$expected" "$actual"
+
+bash -lc 'source /workspace/lib/common.sh; source /workspace/lib/tools.sh; NON_INTERACTIVE=1 TOOLS_PRESET=recommended resolve_tool_selection --' > "$actual"
 printf "%s\n" runtime shell modern-cli docker-wsl-engine > "$expected"
 diff -u "$expected" "$actual"
 
@@ -90,7 +125,7 @@ saved_home="$(mktemp -d)"
 mkdir -p "$saved_home/.config/dotfiles"
 printf "%s\n" base shell history docker-wsl-engine > "$saved_home/.config/dotfiles/selected-tools"
 HOME="$saved_home" bash -lc 'source /workspace/lib/common.sh; source /workspace/lib/tools.sh; NON_INTERACTIVE=1 resolve_tool_selection --' > "$actual"
-printf "%s\n" runtime shell history docker-wsl-engine > "$expected"
+printf "%s\n" shell history docker-wsl-engine > "$expected"
 diff -u "$expected" "$actual"
 
 HOME="$saved_home" bash -lc 'source /workspace/lib/common.sh; source /workspace/lib/tools.sh; NON_INTERACTIVE=1 resolve_tool_selection modern-cli -- history' > "$actual"
@@ -143,6 +178,8 @@ export HOME=/tmp/dotfiles-home
 export DOTFILES_TEST_MODE=1
 rm -rf "$HOME"
 mkdir -p "$HOME"
+printf 'export USER_BASHRC_SURVIVED=1\n' > "$HOME/.bashrc"
+printf 'export USER_ZSHRC_SURVIVED=1\n' > "$HOME/.zshrc"
 
 ./setup install \
   --non-interactive \
@@ -173,11 +210,22 @@ grep -q "DOTFILES_TEST_MODE: skipped login shell change" /tmp/setup-install-firs
 
 test "$(cat "$HOME/.config/dotfiles/profile")" = "personal"
 test "$(cat "$HOME/.config/dotfiles/root")" = "/workspace"
-test -L "$HOME/.zshrc"
+test -f "$HOME/.bashrc"
+test ! -L "$HOME/.bashrc"
+test -f "$HOME/.zshrc"
+test ! -L "$HOME/.zshrc"
+test -L "$HOME/.config/dotfiles/shell/shared.sh"
+test -L "$HOME/.config/dotfiles/shell/bashrc"
+test -L "$HOME/.config/dotfiles/shell/zshrc"
+test "$(grep -Fxc '# >>> dotfiles managed >>>' "$HOME/.bashrc")" = 1
+test "$(grep -Fxc '# >>> dotfiles managed >>>' "$HOME/.zshrc")" = 1
+grep -Fqx 'export USER_BASHRC_SURVIVED=1' "$HOME/.bashrc"
+grep -Fqx 'export USER_ZSHRC_SURVIVED=1' "$HOME/.zshrc"
 test -L "$HOME/.gitconfig"
 test -L "$HOME/.config/mise/config.toml"
 test -L "$HOME/.config/mise/default-tools.toml"
 test -L "$HOME/.config/starship.toml"
+test -L "$HOME/.local/bin/wslview"
 test -f "$HOME/.config/git/identity.gitconfig"
 test -f "$HOME/.ssh/config"
 test -f "$HOME/.config/dotfiles/selected-tools"
@@ -187,9 +235,14 @@ test "$(cat "$HOME/.config/dotfiles/default-shell")" = "zsh"
 grep -q "Test User" "$HOME/.config/git/identity.gitconfig"
 grep -q "test@example.com" "$HOME/.config/git/identity.gitconfig"
 zsh -ic 'test "$DOTFILES" = "/workspace"'
+zsh -ic 'test "$USER_ZSHRC_SURVIVED" = 1'
 zsh -ic 'alias ll' | grep -q 'ls -la'
 zsh -ic 'whence -w path_prepend' | grep -q 'function'
 ! zsh -ic 'true' 2>&1 | grep -q 'no matches found'
+bash --noprofile --rcfile "$HOME/.bashrc" -ic 'test "$DOTFILES" = "/workspace"'
+bash --noprofile --rcfile "$HOME/.bashrc" -ic 'test "$USER_BASHRC_SURVIVED" = 1'
+bash --noprofile --rcfile "$HOME/.bashrc" -ic 'alias ll' | grep -q 'ls -la'
+bash --noprofile --rcfile "$HOME/.bashrc" -ic 'declare -F path_prepend' >/dev/null
 
 echo "==> idempotency"
 before_identity="$(sha256sum "$HOME/.config/git/identity.gitconfig")"
@@ -205,7 +258,7 @@ before_ssh="$(sha256sum "$HOME/.ssh/config")"
   --default-shell unchanged 2>&1 | tee /tmp/setup-install-second.txt
 
 grep -q "Profile:.*personal" /tmp/setup-install-second.txt
-grep -q "Git identity:.*configured at" /tmp/setup-install-second.txt
+grep -q "Git identity:.*configured as Changed User <changed@example.com>" /tmp/setup-install-second.txt
 grep -q "Default shell:.*unchanged" /tmp/setup-install-second.txt
 
 ./setup install \
@@ -213,20 +266,36 @@ grep -q "Default shell:.*unchanged" /tmp/setup-install-second.txt
   --no-doctor 2>&1 | tee /tmp/setup-install-detected.txt
 
 grep -q "Profile:.*personal (saved state)" /tmp/setup-install-detected.txt
-grep -q "Git identity:.*configured at" /tmp/setup-install-detected.txt
+grep -q "Git identity:.*configured as Changed User <changed@example.com>" /tmp/setup-install-detected.txt
 grep -q "Tool selection:.*saved state" /tmp/setup-install-detected.txt
 grep -q "Docker:.*None (saved state)" /tmp/setup-install-detected.txt
 grep -q "Default shell:.*unchanged" /tmp/setup-install-detected.txt
 
 after_identity="$(sha256sum "$HOME/.config/git/identity.gitconfig")"
 after_ssh="$(sha256sum "$HOME/.ssh/config")"
-test "$before_identity" = "$after_identity"
+test "$before_identity" != "$after_identity"
 test "$before_ssh" = "$after_ssh"
-grep -q "Test User" "$HOME/.config/git/identity.gitconfig"
-! grep -q "Changed User" "$HOME/.config/git/identity.gitconfig"
+grep -q "Changed User" "$HOME/.config/git/identity.gitconfig"
+grep -q "changed@example.com" "$HOME/.config/git/identity.gitconfig"
+test "$(grep -Fxc '# >>> dotfiles managed >>>' "$HOME/.bashrc")" = 1
+test "$(grep -Fxc '# >>> dotfiles managed >>>' "$HOME/.zshrc")" = 1
+grep -Fqx 'export USER_BASHRC_SURVIVED=1' "$HOME/.bashrc"
+grep -Fqx 'export USER_ZSHRC_SURVIVED=1' "$HOME/.zshrc"
+
+echo "==> rc block repair"
+printf '%s\n' '# >>> dotfiles managed >>>' 'source "$HOME/.config/dotfiles/shell/bashrc"' '# <<< dotfiles managed <<<' '# >>> dotfiles managed >>>' 'source "$HOME/.config/dotfiles/shell/bashrc"' '# <<< dotfiles managed <<<' 'export BASH_REPAIR_SURVIVED=1' > "$HOME/.bashrc"
+printf '%s\n' 'export ZSH_REPAIR_SURVIVED=1' '# >>> dotfiles managed >>>' 'source "$HOME/.config/dotfiles/shell/zshrc"' > "$HOME/.zshrc"
+./setup doctor >/tmp/setup-doctor-malformed.txt 2>&1
+grep -q '.bashrc is missing a valid dotfiles managed block' /tmp/setup-doctor-malformed.txt
+grep -q '.zshrc is missing a valid dotfiles managed block' /tmp/setup-doctor-malformed.txt
+./setup install --non-interactive --no-doctor >/tmp/setup-repair.txt 2>&1
+test "$(grep -Fxc '# >>> dotfiles managed >>>' "$HOME/.bashrc")" = 1
+test "$(grep -Fxc '# >>> dotfiles managed >>>' "$HOME/.zshrc")" = 1
+grep -Fqx 'export BASH_REPAIR_SURVIVED=1' "$HOME/.bashrc"
+grep -Fqx 'export ZSH_REPAIR_SURVIVED=1' "$HOME/.zshrc"
 
 echo "==> reconfigure keeps saved values"
-printf "\n\n\n\n\n\n\ny\n" | ./setup install --reconfigure --no-doctor 2>&1 | tee /tmp/setup-reconfigure-keep.txt
+printf "\nn\n\n\n\n\n\n\ny\n" | ./setup install --reconfigure --no-doctor 2>&1 | tee /tmp/setup-reconfigure-keep.txt
 grep -q "Profile:.*personal (reconfigure prompt)" /tmp/setup-reconfigure-keep.txt
 grep -q "Tool selection:.*reconfigure prompts" /tmp/setup-reconfigure-keep.txt
 grep -q "Docker:.*None (reconfigure prompts)" /tmp/setup-reconfigure-keep.txt
@@ -236,10 +305,10 @@ printf "%s\n" shell > "$expected"
 diff -u "$expected" "$HOME/.config/dotfiles/selected-tools"
 
 echo "==> reconfigure changes saved values"
-printf "\n\n\n\n\n1\n1\ny\n" | ./setup install --reconfigure --no-doctor 2>&1 | tee /tmp/setup-reconfigure-change.txt
-grep -q "Docker:.*Docker Desktop (reconfigure prompts)" /tmp/setup-reconfigure-change.txt
+printf "\nn\n\n\n\n\n1\n1\ny\n" | ./setup install --reconfigure --no-doctor 2>&1 | tee /tmp/setup-reconfigure-change.txt
+grep -q "Docker:.*WSL Docker Engine (reconfigure prompts)" /tmp/setup-reconfigure-change.txt
 grep -q "Default shell:.*zsh (reconfigure prompt)" /tmp/setup-reconfigure-change.txt
-grep -qx "docker-desktop" "$HOME/.config/dotfiles/selected-tools"
+grep -qx "docker-wsl-engine" "$HOME/.config/dotfiles/selected-tools"
 test "$(cat "$HOME/.config/dotfiles/default-shell")" = "zsh"
 
 echo "==> dry-run"
@@ -268,6 +337,7 @@ test ! -e /tmp/dotfiles-dry-home/.config/dotfiles/root
 test ! -e /tmp/dotfiles-dry-home/.config/dotfiles/selected-tools
 test ! -e /tmp/dotfiles-dry-home/.config/dotfiles/default-shell
 test ! -e /tmp/dotfiles-dry-home/.config/git/identity.gitconfig
+test ! -e /tmp/dotfiles-dry-home/.local/bin/wslview
 
 echo "==> existing install without default-shell"
 rm -rf /tmp/dotfiles-old-home
@@ -283,6 +353,28 @@ grep -q "Default shell:.*unchanged (saved state default)" /tmp/setup-old-home.tx
 test "$(cat /tmp/dotfiles-old-home/.config/dotfiles/default-shell)" = "unchanged"
 printf "%s\n" shell > "$expected"
 diff -u "$expected" /tmp/dotfiles-old-home/.config/dotfiles/selected-tools
+
+echo "==> legacy zshrc symlink migration"
+rm -rf /tmp/dotfiles-legacy-zsh-home
+mkdir -p /tmp/dotfiles-legacy-zsh-home
+legacy_zshrc_hash="$(sha256sum /workspace/zsh/zshrc)"
+ln -s /workspace/zsh/zshrc /tmp/dotfiles-legacy-zsh-home/.zshrc
+HOME=/tmp/dotfiles-legacy-zsh-home DOTFILES_ROOT=/workspace /workspace/install/link.sh >/tmp/link-legacy-zsh.txt
+test -f /tmp/dotfiles-legacy-zsh-home/.zshrc
+test ! -L /tmp/dotfiles-legacy-zsh-home/.zshrc
+grep -Fqx 'source "$HOME/.config/dotfiles/shell/zshrc"' /tmp/dotfiles-legacy-zsh-home/.zshrc
+test "$legacy_zshrc_hash" = "$(sha256sum /workspace/zsh/zshrc)"
+
+echo "==> bash login-shell selection"
+rm -rf /tmp/dotfiles-bash-shell-home
+mkdir -p /tmp/dotfiles-bash-shell-home
+HOME=/tmp/dotfiles-bash-shell-home ./setup install \
+  --non-interactive --no-doctor --profile personal \
+  --git-name "Bash User" --git-email bash@example.com \
+  --tools minimal --docker none --default-shell bash >/tmp/setup-bash-shell.txt 2>&1
+grep -q 'Default shell:.*bash' /tmp/setup-bash-shell.txt
+grep -q 'Configuring bash as login shell' /tmp/setup-bash-shell.txt
+test "$(cat /tmp/dotfiles-bash-shell-home/.config/dotfiles/default-shell)" = bash
 
 echo "==> corporate CA selected install"
 rm -rf /tmp/dotfiles-work-ca-home
@@ -326,7 +418,7 @@ grep -q "^Doctor$" /tmp/setup-doctor.txt
 ! grep -q "Dotfiles doctor" /tmp/setup-doctor.txt
 grep -q "Available follow-ups" /tmp/setup-doctor.txt
 
-docker_warns="$(grep -c "Docker missing or Docker Desktop WSL integration disabled" /tmp/setup-doctor.txt || true)"
+docker_warns="$(grep -c "Docker missing or the selected Docker strategy is not ready" /tmp/setup-doctor.txt || true)"
 test "$docker_warns" -le 1
 
 echo "Docker test pipeline passed"
