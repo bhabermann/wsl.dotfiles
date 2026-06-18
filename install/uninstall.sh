@@ -5,11 +5,16 @@ action_uninstall() {
 Uninstall is intentionally conservative.
 
 Manual cleanup targets:
-  ~/.zshrc
+  Marker-managed blocks in ~/.bashrc and ~/.zshrc
+  ~/.config/dotfiles/shell/
   ~/.gitconfig
   ~/.config/mise/config.toml
   ~/.config/mise/default-tools.toml
   ~/.config/starship.toml
+  ~/.local/bin/wslview
+
+The PowerShell profiles may contain a marker-managed "dotfiles docker-wsl"
+function block.
 
 Local machine files are not removed automatically:
   ~/.config/dotfiles/

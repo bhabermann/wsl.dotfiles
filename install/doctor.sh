@@ -12,6 +12,17 @@ action_doctor() {
 
   action_verify || true
 
+  if managed_source_block_valid "$HOME/.bashrc" bashrc; then
+    ok "Bash rc managed source block"
+  else
+    warn "$HOME/.bashrc is missing a valid dotfiles managed block; rerun ./setup install"
+  fi
+  if managed_source_block_valid "$HOME/.zshrc" zshrc; then
+    ok "Zsh rc managed source block"
+  else
+    warn "$HOME/.zshrc is missing a valid dotfiles managed block; rerun ./setup install"
+  fi
+
   if [[ -f "$DOTFILES_CONFIG_DIR/profile" ]]; then
     profile="$(tr -d '[:space:]' < "$DOTFILES_CONFIG_DIR/profile")"
     field "Profile" "$profile"
@@ -23,7 +34,7 @@ action_doctor() {
 
   info "Available follow-ups:"
   item "Runtime tools are handled when Runtime is selected."
-  item "If Docker Desktop is selected and docker is unavailable, enable WSL integration in Docker Desktop."
+  item "If WSL Docker Engine is selected and docker is unavailable, rerun: ./setup install --docker wsl-engine"
   if [[ "$profile" == "work" ]]; then
     item "If curl, git, mise, npm, package installers, or Docker setup report TLS certificate errors on the corporate network, configure $DOTFILES_CONFIG_DIR/corporate-ca.env and rerun: ./setup install --profile work --with corporate-ca"
   fi

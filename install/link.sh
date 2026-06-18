@@ -16,13 +16,21 @@ link_file "$DOTFILES_ROOT/mise/default-tools.toml" "$HOME/.config/mise/default-t
 
 [[ "$ONLY_MISE" == "1" ]] && exit 0
 
-link_file "$DOTFILES_ROOT/zsh/zshrc" "$HOME/.zshrc"
+mkdir -p "$DOTFILES_CONFIG_DIR/shell"
+link_file "$DOTFILES_ROOT/shell/shared.sh" "$DOTFILES_CONFIG_DIR/shell/shared.sh"
+link_file "$DOTFILES_ROOT/shell/bashrc" "$DOTFILES_CONFIG_DIR/shell/bashrc"
+link_file "$DOTFILES_ROOT/shell/zshrc" "$DOTFILES_CONFIG_DIR/shell/zshrc"
+ensure_managed_source_block "$HOME/.bashrc" bashrc
+ensure_managed_source_block "$HOME/.zshrc" zshrc "$DOTFILES_ROOT/zsh/zshrc"
 link_file "$DOTFILES_ROOT/git/gitconfig" "$HOME/.gitconfig"
 link_file "$DOTFILES_ROOT/starship/starship.toml" "$HOME/.config/starship.toml"
+mkdir -p "$HOME/.local/bin"
+link_file "$DOTFILES_ROOT/scripts/wslview" "$HOME/.local/bin/wslview"
 
 copy_template_if_missing "$DOTFILES_ROOT/templates/git/identity.gitconfig.template" "$HOME/.config/git/identity.gitconfig"
-if [[ -n "${GIT_NAME:-}" && -n "${GIT_EMAIL:-}" ]]; then
-  sed -i "s|__GIT_NAME__|$GIT_NAME|g; s|__GIT_EMAIL__|$GIT_EMAIL|g" "$HOME/.config/git/identity.gitconfig"
+if [[ "${GIT_IDENTITY_WRITE:-0}" == "1" && -n "${GIT_NAME:-}" && -n "${GIT_EMAIL:-}" ]]; then
+  git config --file "$HOME/.config/git/identity.gitconfig" user.name "$GIT_NAME"
+  git config --file "$HOME/.config/git/identity.gitconfig" user.email "$GIT_EMAIL"
 fi
 
 mkdir -p "$HOME/.ssh"

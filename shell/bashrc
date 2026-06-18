@@ -1,0 +1,28 @@
+# Bash-specific interactive-shell configuration.
+
+source "$HOME/.config/dotfiles/shell/shared.sh"
+
+HISTFILE="${HISTFILE:-$HOME/.bash_history}"
+HISTSIZE=50000
+HISTFILESIZE=50000
+HISTCONTROL=ignoreboth:erasedups
+shopt -s histappend
+
+if [[ -r /usr/share/bash-completion/bash_completion ]]; then
+  source /usr/share/bash-completion/bash_completion
+elif [[ -r /etc/bash_completion ]]; then
+  source /etc/bash_completion
+fi
+
+if [[ -x /usr/bin/mise ]]; then
+  eval "$(/usr/bin/mise activate bash)" 2>/dev/null || true
+elif command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate bash)" 2>/dev/null || true
+elif [[ -x "$HOME/.local/bin/mise" ]]; then
+  eval "$("$HOME/.local/bin/mise" activate bash)" 2>/dev/null || true
+fi
+
+command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init bash)"
+command -v atuin >/dev/null 2>&1 && eval "$(atuin init bash)"
+command -v direnv >/dev/null 2>&1 && eval "$(direnv hook bash)"
+command -v starship >/dev/null 2>&1 && eval "$(starship init bash)"
