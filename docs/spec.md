@@ -2,7 +2,7 @@
 
 ## Platform
 
-- Ubuntu 24.04 on WSL2.
+- Ubuntu 26.04 on WSL2.
 - Windows 11 host.
 - Clone and run from the Linux filesystem, preferably `~/.dotfiles`.
 
@@ -14,7 +14,7 @@
 - `--no-doctor` skips final doctor checks after install/linking.
 - Plain reruns reuse saved setup choices from `~/.config/dotfiles/` and skip onboarding prompts.
 - `--reconfigure` asks setup questions again, showing saved choices as defaults.
-- `--default-shell zsh|unchanged` controls whether install attempts to make zsh the login shell.
+- `--default-shell zsh|bash|unchanged` controls the login-shell change.
 - Tool groups have user-facing descriptions and recommended defaults.
 - Ubuntu base packages are an always-run dependency setup step, not a selectable tool group.
 - Local identity and secrets are never committed or overwritten.
@@ -31,20 +31,22 @@
 | corporate-ca | explicit work opt-in | Capture configured corporate TLS interception CA chains and install only allowlisted CA certificates |
 
 Dependency setup always runs first during real installs and installs Ubuntu
-essentials for compiling, downloads, certificates, archives, locale, and JSON
-handling. Dry-runs show this step in the plan without installing packages or
+essentials for compiling, downloads, certificates, archives, locale, JSON,
+Windows-browser launching, and mise-managed .NET native dependencies. Dry-runs show this step in the plan without installing packages or
 writing state. Legacy saved `selected-tools` entries and `--with/--without
 base` flags are accepted as no-ops and are not persisted.
 
-Ubuntu apt owns WSL system tools and general CLIs. mise is reserved for global
-developer language runtimes and project version switching for `node`, `python`,
-`java`, `dotnet`, and `go`. Atuin is the only optional non-language mise
-exception because it is not available through standard Ubuntu 24.04 apt sources.
+Ubuntu apt owns WSL system tools and general CLIs, including Starship, Atuin,
+zsh autosuggestions, and syntax highlighting. mise is installed from its
+official Ubuntu 26.04 PPA and is reserved for global developer language
+runtimes and project version switching for `node`, `python`, `java`, `dotnet`,
+and `go`. `zsh-completions` is the only Git-installed shell exception because
+Ubuntu 26.04 does not package it.
 
 Docker is not a tool group prompt. It is one mutually exclusive strategy:
 
-- `desktop`: recommended Docker Desktop WSL integration check.
-- `wsl-engine`: Docker Engine inside WSL.
+- `wsl-engine`: recommended Docker Engine inside WSL.
+- `desktop`: optional Docker Desktop WSL integration check.
 - `none`: skip Docker setup.
 
 Corporate CA support is never selected by presets. Interactive installs only ask
@@ -62,8 +64,12 @@ persisted setup state, not live command detection.
 - Existing local files are preserved.
 - Existing installs missing `default-shell` resolve to `unchanged` on plain rerun.
 - Interactive prompts include labels, recommendation tags, and explanations.
+- History is marked Optional in light blue and remains disabled by default.
+- Existing Git identity values are displayed and preserved unless explicitly changed.
+- `wslview` opens URLs with the default Windows browser through `explorer.exe`.
 - Dry-run does not create profile, identity, links, templates, or backups.
 - Corporate CA dry-run does not install certificates or update system trust.
 - No-doctor install still prints the final Complete section.
 - zsh startup resolves the installed repo root and loads aliases/modules from any checkout path.
-- `./scripts/test-docker.sh` passes on Docker with Ubuntu 24.04.
+- Bash and Zsh load shared configuration through marker-managed blocks in regular user rc files.
+- `./scripts/test-docker.sh` passes on Docker with Ubuntu 26.04.

@@ -8,8 +8,8 @@ Before opening a pull request:
 - Keep machine-specific identity, secrets, hostnames, and corporate details out
   of the repository.
 - Prefer Ubuntu apt for WSL system tools and general CLIs.
-- Use mise only for global developer language runtimes, project version
-  switching, and the optional Atuin history tool.
+- Install mise through its APT repository and use it only for global developer
+  language runtimes and project version switching.
 - Run the smoke tests when touching setup behavior:
 
 ```bash

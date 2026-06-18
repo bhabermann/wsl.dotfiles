@@ -1,6 +1,6 @@
 # wsl.dotfiles
 
-Public-safe dotfiles for Ubuntu 24.04 on WSL2 running on Windows 11.
+Public-safe dotfiles for Ubuntu 26.04 on WSL2 running on Windows 11.
 
 This project is interactive by default and keeps machine-specific identity,
 secrets, and overrides outside the repository.
@@ -22,7 +22,7 @@ For automation:
   --git-name "Your Name" \
   --git-email you@example.com \
   --tools recommended \
-  --docker desktop \
+  --docker wsl-engine \
   --default-shell zsh
 ```
 
@@ -48,7 +48,7 @@ Useful install options:
   and installation plan without creating files, links, backups, or installing
   tools.
 - `--no-doctor` skips the final doctor checks after a normal install.
-- `--default-shell zsh` sets zsh as the login shell. Interactive installs ask
+- `--default-shell zsh` or `--default-shell bash` selects the login shell. Interactive installs ask
   before changing the login shell; non-interactive installs leave it unchanged
   unless this option is provided.
 - `--reconfigure` edits saved setup choices. Prompts show the saved value as the
@@ -58,11 +58,16 @@ Every real install first bootstraps the Ubuntu packages that later setup steps
 assume are present:
 
 ```text
-build-essential curl wget git ca-certificates gnupg jq unzip zip locales software-properties-common
+build-essential curl wget git openssh-client ca-certificates gnupg jq unzip zip less locales software-properties-common xdg-utils libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata
 ```
 
 Dependency setup appears in the installation plan, but it is not a selectable
 or persisted tool group.
+
+The runtime libraries include the native ICU, SSL, Kerberos, timezone, and
+compression dependencies required by mise-managed .NET. The installer also
+provides `wslview`; commands honoring `BROWSER` open URLs in the default Windows
+browser through `explorer.exe`.
 
 After a real install, setup saves the selected profile, tool groups, Docker
 strategy, and default-shell choice under `~/.config/dotfiles/`. Plain reruns
@@ -72,6 +77,10 @@ installation confirmation in interactive mode.
 Explicit flags such as `--profile`, `--tools`, `--with`, `--without`,
 `--docker`, and `--default-shell` override the saved baseline for that run and
 are persisted after a real install.
+
+Existing Git identity values are detected and displayed. Interactive reruns ask
+whether to change them and default to preserving them; explicit `--git-name`
+and `--git-email` flags update the managed identity.
 
 ## Interactive Tool Selection
 
@@ -104,21 +113,27 @@ Optional groups:
 ## Package Policy
 
 Ubuntu apt owns WSL system tools and general CLIs. That includes `zsh`, `fzf`,
-`direnv`, `zoxide`, `ripgrep`, `fd-find`, `bat`, `tree`, `tmux`, `jq`, `gh`,
-`eza`, and `yq`.
+`direnv`, `starship`, `zoxide`, `zsh-autosuggestions`,
+`zsh-syntax-highlighting`, `atuin`, `ripgrep`, `fd-find`, `bat`, `tree`,
+`tmux`, `jq`, `gh`, `eza`, and `yq`. `zsh-completions` remains a Git-installed
+exception because Ubuntu 26.04 does not package it.
 
-mise owns globally available developer language runtimes and project version
-switching for `node`, `python`, `java`, `dotnet`, and `go`. The installer links
+Both Bash and Zsh are configured regardless of the selected login shell. Setup
+keeps `~/.bashrc` and `~/.zshrc` as regular user-owned files and maintains one
+small source block in each. Shared environment, PATH, aliases, profile loading,
+and local overrides live under `~/.config/dotfiles/shell/`; shell-specific
+history, completion, hooks, plugins, and prompt setup remain separate.
+
+mise is installed from its official Ubuntu 26.04 PPA and owns globally
+available developer language runtimes and project version switching for
+`node`, `python`, `java`, `dotnet`, and `go`. The installer links
 the global mise config into `~/.config/mise/`, keeps `~/.local/bin` and
 `~/.local/share/mise/shims` on `PATH`, and activates mise from zsh.
 
-Atuin is the only optional non-language mise exception because it is not
-available through standard Ubuntu 24.04 apt sources.
-
 Docker is selected with one strategy prompt:
 
-- Docker Desktop: recommended default, verifies WSL integration.
-- WSL Docker Engine: installs Docker Engine inside WSL.
+- WSL Docker Engine: recommended default, installs Docker Engine inside WSL.
+- Docker Desktop: optionally verifies Windows-side WSL integration.
 - None: skips Docker setup.
 
 ## Profiles and Secrets
@@ -184,16 +199,16 @@ The Windows bootstrap uses winget and asks about each tool by default.
 
 ## Docker
 
-Docker Desktop is the recommended default:
-
-```bash
-./setup install --docker desktop
-```
-
-Docker Engine inside WSL is available as an explicit opt-in:
+Docker Engine inside WSL is the recommended default:
 
 ```bash
 ./setup install --docker wsl-engine
+```
+
+Docker Desktop integration remains available as an explicit opt-in:
+
+```bash
+./setup install --docker desktop
 ```
 
 ## Test Pipeline
@@ -204,10 +219,12 @@ Run the Docker test pipeline from the repo root:
 ./scripts/test-docker.sh
 ```
 
-Docker Desktop must be running. The script uses `docker` when WSL integration is
-enabled and falls back to `docker.exe` when the Windows Docker CLI is reachable.
+Docker Engine must be running inside WSL. Setup enables its systemd service and
+adds a managed PowerShell `docker` function that forwards to this WSL distro.
+The test script uses `docker` when available
+and can still fall back to `docker.exe` when Docker Desktop integration is used.
 
-The pipeline builds `Dockerfile.test` with Ubuntu 24.04 and runs:
+The pipeline builds `Dockerfile.test` with Ubuntu 26.04 and runs:
 
 - Bash syntax checks.
 - `./setup help` smoke test.
