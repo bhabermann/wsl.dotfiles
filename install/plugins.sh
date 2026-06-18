@@ -14,6 +14,4 @@ clone_plugin() {
   fi
 }
 
-clone_plugin https://github.com/zsh-users/zsh-autosuggestions "$PLUGIN_DIR/zsh-autosuggestions"
-clone_plugin https://github.com/zsh-users/zsh-syntax-highlighting "$PLUGIN_DIR/zsh-syntax-highlighting"
 clone_plugin https://github.com/zsh-users/zsh-completions "$PLUGIN_DIR/zsh-completions"

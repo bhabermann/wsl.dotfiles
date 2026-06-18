@@ -17,7 +17,7 @@ $Tools = @(
     @{ Id = "Git.Git"; Name = "Git for Windows"; Recommended = $true; Optional = $false; Description = "Windows-side Git and SSH support." },
     @{ Id = "GitHub.cli"; Name = "GitHub CLI"; Recommended = $true; Optional = $false; Description = "GitHub authentication and repository operations." },
     @{ Id = "Microsoft.VisualStudioCode"; Name = "Visual Studio Code"; Recommended = $true; Optional = $false; Description = "Editor with WSL integration." },
-    @{ Id = "Docker.DockerDesktop"; Name = "Docker Desktop"; Recommended = $true; Optional = $false; Description = "Recommended Docker backend for WSL." },
+    @{ Id = "Docker.DockerDesktop"; Name = "Docker Desktop"; Recommended = $false; Optional = $true; Description = "Optional Windows-side Docker backend; Docker Engine inside WSL is preferred." },
     @{ Id = "AgileBits.1Password"; Name = "1Password"; Recommended = $true; Optional = $false; Description = "Secrets app and SSH agent integration." },
     @{ Id = "AgileBits.1Password.CLI"; Name = "1Password CLI"; Recommended = $true; Optional = $false; Description = "Command line access to 1Password." },
     @{ Id = "Starship.Starship"; Name = "Starship"; Recommended = $true; Optional = $false; Description = "Cross-shell prompt support on Windows." },
@@ -130,5 +130,5 @@ Write-Step "Windows bootstrap complete"
 Write-Host ""
 Write-Host "Manual checks:" -ForegroundColor Cyan
 Write-Host "1. 1Password -> Settings -> Developer -> enable CLI integration and SSH Agent."
-Write-Host "2. Docker Desktop -> Settings -> Resources -> WSL Integration -> enable this Ubuntu distro."
+Write-Host "2. In Ubuntu WSL, run ./setup install --docker wsl-engine to install the recommended Docker backend."
 Write-Host "3. Configure terminal font to JetBrains Mono Nerd Font."

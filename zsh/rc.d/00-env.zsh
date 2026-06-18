@@ -3,6 +3,7 @@ export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 export EDITOR="${EDITOR:-code}"
 export VISUAL="${VISUAL:-code}"
 export PAGER="${PAGER:-less -FRX}"
+export BROWSER="${BROWSER:-wslview}"
 
 DOTFILES_CFG_DIR="$HOME/.config/dotfiles"
 PROFILE_FILE="$DOTFILES_CFG_DIR/profile"

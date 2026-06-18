@@ -10,6 +10,7 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   C_STEP=$'\033[1;34m'
   C_SECTION=$'\033[1;36m'
   C_OK=$'\033[1;32m'
+  C_OPTIONAL=$'\033[1;94m'
   C_WARN=$'\033[1;33m'
   C_ERR=$'\033[1;31m'
   C_LABEL=$'\033[1m'
@@ -19,6 +20,7 @@ else
   C_STEP=""
   C_SECTION=""
   C_OK=""
+  C_OPTIONAL=""
   C_WARN=""
   C_ERR=""
   C_LABEL=""
@@ -45,10 +47,10 @@ is_wsl() {
   [[ -n "${WSL_INTEROP:-}" ]] || [[ -e /proc/sys/fs/binfmt_misc/WSLInterop ]]
 }
 
-is_ubuntu_2404() {
+is_ubuntu_2604() {
   [[ -r /etc/os-release ]] || return 1
   . /etc/os-release
-  [[ "${ID:-}" == "ubuntu" && "${VERSION_ID:-}" == "24.04" ]]
+  [[ "${ID:-}" == "ubuntu" && "${VERSION_ID:-}" == "26.04" ]]
 }
 
 confirm() {
@@ -72,7 +74,7 @@ confirm_aligned() {
   local name="$1"
   local description="$2"
   local default="${3:-Y}"
-  local recommended="${4:-0}"
+  local badge="${4:-}"
   local answer label tag
 
   if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then
@@ -83,7 +85,10 @@ confirm_aligned() {
   label="[y/N]"
   [[ "$default" =~ ^[Yy]$ ]] && label="[Y/n]"
   tag=""
-  [[ "$recommended" == "1" ]] && tag="${C_OK}(Recommended)${C_RESET} "
+  case "$badge" in
+    recommended|1) tag="${C_OK}(Recommended)${C_RESET} " ;;
+    optional) tag="${C_OPTIONAL}(Optional)${C_RESET} " ;;
+  esac
 
   printf "  %s%-5s%s %-12s %s%s\n" "$C_LABEL" "$label" "$C_RESET" "$name" "$tag" "$description" >&2
   read -r -p "        Select ${name} ${label}: " answer
@@ -161,6 +166,77 @@ copy_template_if_missing() {
   fi
   cp "$src" "$dest"
   ok "Created $dest from template"
+}
+
+ensure_managed_source_block() {
+  local rc_file="$1"
+  local source_file="$2"
+  local legacy_target="${3:-}"
+  local begin="# >>> dotfiles managed >>>"
+  local end="# <<< dotfiles managed <<<"
+  local source_line="source \"\$HOME/.config/dotfiles/shell/$source_file\""
+  local tmp
+
+  mkdir -p "$(dirname "$rc_file")"
+  if [[ -L "$rc_file" ]]; then
+    tmp="$(mktemp)"
+    if [[ -n "$legacy_target" && "$(readlink -f "$rc_file" 2>/dev/null || true)" == "$(readlink -f "$legacy_target" 2>/dev/null || true)" ]]; then
+      : > "$tmp"
+    elif [[ -e "$rc_file" ]]; then
+      cp -L "$rc_file" "$tmp"
+    else
+      : > "$tmp"
+    fi
+    rm "$rc_file"
+    mv "$tmp" "$rc_file"
+    ok "Migrated $rc_file to a regular user-owned file"
+  elif [[ ! -e "$rc_file" ]]; then
+    : > "$rc_file"
+  fi
+
+  tmp="$(mktemp)"
+  awk -v begin="$begin" -v end="$end" -v source_line="$source_line" '
+    $0 == begin { if (managed) print buffered; managed=1; buffered=""; next }
+    managed && $0 == end { managed=0; buffered=""; next }
+    managed {
+      if ($0 != source_line && $0 != begin) buffered = buffered $0 ORS
+      next
+    }
+    $0 == end || $0 == source_line { next }
+    { print }
+    END { if (managed) printf "%s", buffered }
+  ' "$rc_file" > "$tmp"
+
+  if [[ -s "$tmp" ]] && [[ "$(tail -c 1 "$tmp" | wc -l)" -eq 0 ]]; then
+    printf '\n' >> "$tmp"
+  fi
+  if [[ -s "$tmp" ]]; then
+    printf '\n' >> "$tmp"
+  fi
+  printf '%s\n%s\n%s\n' "$begin" "$source_line" "$end" >> "$tmp"
+  mv "$tmp" "$rc_file"
+  ok "Configured $rc_file"
+}
+
+managed_source_block_valid() {
+  local rc_file="$1"
+  local source_file="$2"
+  local begin="# >>> dotfiles managed >>>"
+  local end="# <<< dotfiles managed <<<"
+  local source_line="source \"\$HOME/.config/dotfiles/shell/$source_file\""
+
+  [[ -f "$rc_file" && ! -L "$rc_file" ]] || return 1
+  [[ "$(grep -Fxc "$begin" "$rc_file" || true)" == "1" ]] || return 1
+  [[ "$(grep -Fxc "$end" "$rc_file" || true)" == "1" ]] || return 1
+  [[ "$(grep -Fxc "$source_line" "$rc_file" || true)" == "1" ]] || return 1
+  awk -v begin="$begin" -v end="$end" -v source_line="$source_line" '
+    $0 == begin {
+      if ((getline next_line) <= 0 || next_line != source_line) exit 1
+      if ((getline next_line) <= 0 || next_line != end) exit 1
+      valid=1
+    }
+    END { exit(valid ? 0 : 1) }
+  ' "$rc_file"
 }
 
 require_sudo() {

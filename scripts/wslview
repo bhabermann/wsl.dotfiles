@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$#" -ne 1 || -z "${1:-}" ]]; then
+  echo "Usage: wslview URL_OR_PATH" >&2
+  exit 2
+fi
+
+target="$1"
+if [[ -e "$target" ]]; then
+  target="$(wslpath -w "$target")"
+elif [[ ! "$target" =~ ^[A-Za-z][A-Za-z0-9+.-]*: ]]; then
+  echo "wslview: expected a URL or existing path: $target" >&2
+  exit 2
+fi
+
+explorer="${WSLVIEW_EXPLORER:-explorer.exe}"
+command -v "$explorer" >/dev/null 2>&1 || {
+  echo "wslview: explorer.exe is unavailable; Windows interoperability may be disabled" >&2
+  exit 1
+}
+"$explorer" "$target" >/dev/null 2>&1

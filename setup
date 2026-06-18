@@ -12,6 +12,9 @@ NON_INTERACTIVE=0
 PROFILE=""
 GIT_NAME=""
 GIT_EMAIL=""
+GIT_NAME_FLAG=0
+GIT_EMAIL_FLAG=0
+GIT_IDENTITY_WRITE=0
 TOOLS_PRESET="recommended"
 DOCKER_STRATEGY=""
 DEFAULT_SHELL=""
@@ -42,13 +45,13 @@ Commands:
 Options:
   --non-interactive             Do not prompt; require explicit required values
   --profile work|personal       Select profile
-  --git-name NAME               Git identity name for new identity file
-  --git-email EMAIL             Git identity email for new identity file
+  --git-name NAME               Set or update the managed Git identity name
+  --git-email EMAIL             Set or update the managed Git identity email
   --tools minimal|recommended|all
   --with ITEM                   Add a tool or group
   --without ITEM                Remove a tool or group
   --docker desktop|wsl-engine|none
-  --default-shell zsh|unchanged
+  --default-shell zsh|bash|unchanged
   --reconfigure              Prompt again, using saved choices as defaults
   --dry-run                   Show the installation plan without changing files
   --no-doctor                 Skip final doctor checks after install/linking
@@ -59,7 +62,7 @@ Options:
 Examples:
   ./setup
   ./setup install --non-interactive --profile personal --git-name "Test User" --git-email test@example.com
-  ./setup install --tools recommended --with history --docker desktop
+  ./setup install --tools recommended --with history --docker wsl-engine
   ./setup install --profile work --with corporate-ca
 EOF
 }
@@ -81,10 +84,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     --git-name)
       GIT_NAME="${2:-}"
+      GIT_NAME_FLAG=1
       shift 2
       ;;
     --git-email)
       GIT_EMAIL="${2:-}"
+      GIT_EMAIL_FLAG=1
       shift 2
       ;;
     --tools)
@@ -140,7 +145,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-export NON_INTERACTIVE PROFILE GIT_NAME GIT_EMAIL TOOLS_PRESET DOCKER_STRATEGY DEFAULT_SHELL RECONFIGURE VERBOSE LOG_ENABLED DRY_RUN NO_DOCTOR
+export NON_INTERACTIVE PROFILE GIT_NAME GIT_EMAIL GIT_NAME_FLAG GIT_EMAIL_FLAG GIT_IDENTITY_WRITE TOOLS_PRESET DOCKER_STRATEGY DEFAULT_SHELL RECONFIGURE VERBOSE LOG_ENABLED DRY_RUN NO_DOCTOR
 export PROFILE_FLAG TOOLS_FLAG DOCKER_FLAG DEFAULT_SHELL_FLAG
 
 case "$COMMAND" in

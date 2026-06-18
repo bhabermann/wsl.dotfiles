@@ -4,7 +4,7 @@ action_verify() {
   local failed=0
   local selected_file="$DOTFILES_CONFIG_DIR/selected-tools"
   check "WSL environment" is_wsl || failed=1
-  check "Ubuntu 24.04" is_ubuntu_2404 || failed=1
+  check "Ubuntu 26.04" is_ubuntu_2604 || failed=1
 
   if [[ -f "$selected_file" ]]; then
     ok "selected tools recorded"
@@ -13,6 +13,11 @@ action_verify() {
   fi
 
   check_cmd git || failed=1
+  if [[ -x "$HOME/.local/bin/wslview" ]]; then
+    ok "Windows browser bridge"
+  else
+    warn "wslview browser bridge missing; rerun ./setup install"
+  fi
 
   if selected_tool shell; then
     check_cmd zsh || failed=1
@@ -23,12 +28,18 @@ action_verify() {
     warn "shell tools not checked; shell group was not selected"
   fi
 
-  if selected_tool runtime || selected_tool history; then
+  if selected_tool runtime; then
     if ! check_cmd mise; then
-      warn "mise not on PATH; check ~/.local/bin"
+      warn "mise not on PATH; check the mise APT installation"
     fi
   else
     warn "mise not checked; runtime group was not selected"
+  fi
+
+  if selected_tool history; then
+    check_cmd atuin || failed=1
+  else
+    warn "Atuin not checked; history group was not selected"
   fi
 
   if selected_tool modern-cli; then
@@ -49,7 +60,7 @@ action_verify() {
     if need_cmd docker; then
       ok "docker"
     else
-      warn "Docker missing or Docker Desktop WSL integration disabled"
+      warn "Docker missing or the selected Docker strategy is not ready"
     fi
   else
     warn "Docker not checked; no Docker strategy was selected"

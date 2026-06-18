@@ -3,7 +3,6 @@ experimental = true
 idiomatic_version_file_enable_tools = ["node", "python", "java", "go"]
 
 [tools]
-atuin = "latest"
 dotnet = "8"
 go = "latest"
 java = "21"

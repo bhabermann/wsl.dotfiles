@@ -8,12 +8,12 @@ action_install() {
   if is_wsl; then
     field "WSL" "detected"
   else
-    warn "This project targets Ubuntu 24.04 on WSL2."
+    warn "This project targets Ubuntu 26.04 on WSL2."
   fi
-  if is_ubuntu_2404; then
-    field "Ubuntu" "24.04"
+  if is_ubuntu_2604; then
+    field "Ubuntu" "26.04"
   else
-    warn "This project is designed for Ubuntu 24.04."
+    warn "This project is designed for Ubuntu 26.04."
   fi
 
   section "Identity"
@@ -36,13 +36,8 @@ action_install() {
   [[ "$PROFILE" == "personal" || "$PROFILE" == "work" ]] || die "Profile must be personal or work"
   field "Profile" "$PROFILE ($profile_source)"
 
-  if [[ ! -f "$HOME/.config/git/identity.gitconfig" ]]; then
-    GIT_NAME="$(prompt_value "Git name" "${GIT_NAME:-}")"
-    GIT_EMAIL="$(prompt_value "Git email" "${GIT_EMAIL:-}")"
-    identity_status="will create $HOME/.config/git/identity.gitconfig"
-  else
-    identity_status="configured at $HOME/.config/git/identity.gitconfig"
-  fi
+  resolve_git_identity
+  identity_status="$GIT_IDENTITY_STATUS"
   field "Git identity" "$identity_status"
 
   selected_tmp="$(mktemp)"
@@ -69,9 +64,6 @@ action_install() {
   for group in "${selected_groups[@]}"; do
     item "$(tool_label "$group"): $(tool_description "$group")"
   done
-  if has_selected "history" "${selected_groups[@]}" && has_selected "runtime" "${selected_groups[@]}"; then
-    hint "Dependency note: history uses Atuin through mise, so runtime must be installed."
-  fi
   [[ -f "$HOME/.ssh/config" ]] && hint "Preserved: existing SSH config at $HOME/.ssh/config"
   [[ -f "$HOME/.config/git/identity.gitconfig" ]] && hint "Preserved: existing Git identity at $HOME/.config/git/identity.gitconfig"
 
@@ -115,7 +107,55 @@ action_install() {
     source "$DOTFILES_ROOT/install/doctor.sh"
     action_doctor "embedded"
   fi
-  action_complete
+  action_complete "$default_shell_choice"
+}
+
+resolve_git_identity() {
+  local identity_file="$HOME/.config/git/identity.gitconfig"
+  local current_name="" current_email="" source=""
+  GIT_IDENTITY_WRITE=0
+
+  if [[ -f "$identity_file" ]]; then
+    current_name="$(git config --file "$identity_file" --get user.name 2>/dev/null || true)"
+    current_email="$(git config --file "$identity_file" --get user.email 2>/dev/null || true)"
+    source="$identity_file"
+  else
+    current_name="$(git config --global --get user.name 2>/dev/null || true)"
+    current_email="$(git config --global --get user.email 2>/dev/null || true)"
+    [[ -n "$current_name$current_email" ]] && source="existing Git configuration"
+  fi
+  [[ "$current_name" == "__GIT_NAME__" ]] && current_name=""
+  [[ "$current_email" == "__GIT_EMAIL__" ]] && current_email=""
+
+  [[ "${GIT_NAME_FLAG:-0}" == "1" ]] || GIT_NAME="${GIT_NAME:-$current_name}"
+  [[ "${GIT_EMAIL_FLAG:-0}" == "1" ]] || GIT_EMAIL="${GIT_EMAIL:-$current_email}"
+
+  if [[ "${GIT_NAME_FLAG:-0}" == "1" || "${GIT_EMAIL_FLAG:-0}" == "1" ]]; then
+    GIT_NAME="$(prompt_value "Git name" "${GIT_NAME:-$current_name}")"
+    GIT_EMAIL="$(prompt_value "Git email" "${GIT_EMAIL:-$current_email}")"
+    GIT_IDENTITY_WRITE=1
+  elif [[ -n "$GIT_NAME" && -n "$GIT_EMAIL" ]]; then
+    field "Git name" "$GIT_NAME"
+    field "Git email" "$GIT_EMAIL"
+    [[ -n "$source" ]] && hint "Detected from $source"
+    if [[ "${NON_INTERACTIVE:-0}" == "0" ]] && confirm "Change Git identity?" "N"; then
+      GIT_NAME="$(prompt_value "Git name" "$GIT_NAME")"
+      GIT_EMAIL="$(prompt_value "Git email" "$GIT_EMAIL")"
+      GIT_IDENTITY_WRITE=1
+    fi
+  else
+    GIT_NAME="$(prompt_value "Git name" "${GIT_NAME:-$current_name}")"
+    GIT_EMAIL="$(prompt_value "Git email" "${GIT_EMAIL:-$current_email}")"
+    GIT_IDENTITY_WRITE=1
+  fi
+
+  if [[ -f "$identity_file" ]]; then
+    GIT_IDENTITY_STATUS="configured as $GIT_NAME <$GIT_EMAIL>"
+  else
+    GIT_IDENTITY_WRITE=1
+    GIT_IDENTITY_STATUS="will create $identity_file as $GIT_NAME <$GIT_EMAIL>"
+  fi
+  export GIT_NAME GIT_EMAIL GIT_IDENTITY_WRITE GIT_IDENTITY_STATUS
 }
 
 resolve_default_shell() {
@@ -142,11 +182,13 @@ resolve_default_shell() {
     local shell_default="${choice:-zsh}"
     section "Default Shell" >&2
     printf "  %s1)%s Set zsh as login shell %s(Recommended)%s\n" "$C_LABEL" "$C_RESET" "$C_OK" "$C_RESET" >&2
-    printf "  %s2)%s Leave current shell unchanged\n" "$C_LABEL" "$C_RESET" >&2
+    printf "  %s2)%s Set bash as login shell\n" "$C_LABEL" "$C_RESET" >&2
+    printf "  %s3)%s Leave current shell unchanged\n" "$C_LABEL" "$C_RESET" >&2
     case "$shell_default" in
       zsh|1) shell_default="1" ;;
-      unchanged|none|no|N|n|2) shell_default="2" ;;
-      *) shell_default="2" ;;
+      bash|2) shell_default="2" ;;
+      unchanged|none|no|N|n|3) shell_default="3" ;;
+      *) shell_default="3" ;;
     esac
     printf "  Current default: %s\n" "$(default_shell_label "$shell_default")" >&2
     choice="$(prompt_choice "Select default shell [default: $shell_default]:" "$shell_default")"
@@ -156,7 +198,8 @@ resolve_default_shell() {
 
   case "$choice" in
     1|zsh) RESOLVED_DEFAULT_SHELL="zsh" ;;
-    2|unchanged|none|no|N|n) RESOLVED_DEFAULT_SHELL="unchanged" ;;
+    2|bash) RESOLVED_DEFAULT_SHELL="bash" ;;
+    3|unchanged|none|no|N|n) RESOLVED_DEFAULT_SHELL="unchanged" ;;
     *) die "Unknown default shell choice: $choice" ;;
   esac
 }
@@ -164,47 +207,53 @@ resolve_default_shell() {
 default_shell_label() {
   case "$1" in
     1|zsh) printf "zsh" ;;
-    2|unchanged|none|no|N|n) printf "unchanged" ;;
+    2|bash) printf "bash" ;;
+    3|unchanged|none|no|N|n) printf "unchanged" ;;
     *) printf "%s" "$1" ;;
   esac
 }
 
 apply_default_shell() {
   local choice="$1"
-  local zsh_path
+  local shell_path
 
-  [[ "$choice" == "zsh" ]] || return 0
+  [[ "$choice" == "zsh" || "$choice" == "bash" ]] || return 0
 
-  log "Configuring zsh as login shell"
+  log "Configuring $choice as login shell"
   if [[ "${DOTFILES_TEST_MODE:-0}" == "1" ]]; then
     ok "DOTFILES_TEST_MODE: skipped login shell change"
     return 0
   fi
 
-  zsh_path="$(command -v zsh || true)"
-  if [[ -z "$zsh_path" ]]; then
-    warn "zsh is not available; cannot set login shell"
+  shell_path="$(command -v "$choice" || true)"
+  if [[ -z "$shell_path" ]]; then
+    warn "$choice is not available; cannot set login shell"
     return 0
   fi
 
-  if [[ "${SHELL:-}" == "$zsh_path" ]]; then
-    ok "zsh is already the login shell"
+  if [[ "${SHELL:-}" == "$shell_path" ]]; then
+    ok "$choice is already the login shell"
     return 0
   fi
 
-  if chsh -s "$zsh_path"; then
-    ok "Login shell set to $zsh_path"
+  if chsh -s "$shell_path"; then
+    ok "Login shell set to $shell_path"
   else
-    warn "Could not set login shell automatically. You can retry later with: chsh -s $zsh_path"
+    warn "Could not set login shell automatically. You can retry later with: chsh -s $shell_path"
   fi
 }
 
 action_complete() {
+  local shell_choice="${1:-unchanged}"
   section "Complete"
-  field "Restart shell" "exec zsh"
+  if [[ "$shell_choice" == "zsh" || "$shell_choice" == "bash" ]]; then
+    field "Restart shell" "exec $shell_choice"
+  else
+    field "Restart shell" "start a new shell"
+  fi
   field "Preview changes" "./setup install --dry-run"
   field "Reconfigure choices" "./setup install --reconfigure"
-  field "Automation example" "./setup install --non-interactive --tools recommended --docker desktop --default-shell zsh"
+  field "Automation example" "./setup install --non-interactive --tools recommended --docker wsl-engine --default-shell zsh"
 }
 
 has_selected() {
@@ -225,7 +274,7 @@ install_dependency_setup() {
   fi
   require_sudo
   sudo apt-get update -y
-  sudo apt-get install -y build-essential curl wget git ca-certificates gnupg jq unzip zip locales software-properties-common
+  sudo apt-get install -y build-essential curl wget git openssh-client ca-certificates gnupg jq unzip zip less locales software-properties-common xdg-utils bash-completion util-linux-extra libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata
   sudo locale-gen en_US.UTF-8 >/dev/null || true
   sudo update-locale LANG=en_US.UTF-8 >/dev/null || true
 }
@@ -237,34 +286,8 @@ install_shell() {
     return 0
   fi
   require_sudo
-  sudo apt-get install -y zsh fzf direnv
-  if ! need_cmd starship; then
-    install_starship_user
-  fi
-  if ! need_cmd zoxide; then
-    sudo apt-get install -y zoxide || true
-  fi
+  sudo apt-get install -y zsh fzf direnv starship zoxide zsh-autosuggestions zsh-syntax-highlighting
   "$DOTFILES_ROOT/install/plugins.sh"
-}
-
-install_starship_user() {
-  local arch target tmp tarball
-  arch="$(uname -m)"
-  case "$arch" in
-    x86_64|amd64) target="x86_64-unknown-linux-musl" ;;
-    aarch64|arm64) target="aarch64-unknown-linux-musl" ;;
-    *) die "Unsupported Starship architecture: $arch" ;;
-  esac
-
-  log "Installing Starship to ~/.local/bin"
-  mkdir -p "$HOME/.local/bin"
-  tmp="$(mktemp -d)"
-  tarball="$tmp/starship.tar.gz"
-  curl -fsSL "https://github.com/starship/starship/releases/latest/download/starship-${target}.tar.gz" -o "$tarball"
-  tar -xzf "$tarball" -C "$tmp" starship
-  install -m 0755 "$tmp/starship" "$HOME/.local/bin/starship"
-  rm -rf "$tmp"
-  ok "Starship installed at $HOME/.local/bin/starship"
 }
 
 install_modern_cli() {
@@ -284,13 +307,16 @@ install_runtime() {
     "$DOTFILES_ROOT/install/link.sh" --only-mise
     return 0
   fi
-  if ! need_cmd mise && [[ ! -x "$HOME/.local/bin/mise" ]]; then
-    curl -fsSL https://mise.run | sh
-  fi
+  require_sudo
+  sudo add-apt-repository -y ppa:jdxcode/mise
+  sudo apt-get update -y
+  sudo apt-get install -y mise
   export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
   "$DOTFILES_ROOT/install/link.sh" --only-mise
   local mise_cmd
-  mise_cmd="$(command -v mise || true)"
+  mise_cmd=""
+  [[ -x /usr/bin/mise ]] && mise_cmd=/usr/bin/mise
+  [[ -z "$mise_cmd" ]] && mise_cmd="$(command -v mise || true)"
   [[ -z "$mise_cmd" && -x "$HOME/.local/bin/mise" ]] && mise_cmd="$HOME/.local/bin/mise"
   [[ -n "$mise_cmd" ]] || die "mise installation did not provide a usable binary."
   "$mise_cmd" trust "$DOTFILES_ROOT" >/dev/null 2>&1 || true
@@ -304,6 +330,9 @@ install_runtime() {
     "$mise_cmd" use -g "$tool@$version"
   done
   "$mise_cmd" install
+  if ! "$mise_cmd" exec dotnet@8 -- dotnet --version >/dev/null; then
+    die "mise installed .NET, but dotnet could not start. Verify the Ubuntu runtime dependencies, especially libicu78 and libssl3t64."
+  fi
 }
 
 read_mise_default_tools() {
@@ -393,14 +422,8 @@ install_history() {
     ok "DOTFILES_TEST_MODE: skipped Atuin installation"
     return 0
   fi
-  local mise_cmd
-  mise_cmd="$(command -v mise || true)"
-  [[ -z "$mise_cmd" && -x "$HOME/.local/bin/mise" ]] && mise_cmd="$HOME/.local/bin/mise"
-  if [[ -n "$mise_cmd" ]]; then
-    "$mise_cmd" use -g atuin@latest >/dev/null 2>&1 || true
-  else
-    die "mise is required to install Atuin, but runtime installation did not provide it."
-  fi
+  require_sudo
+  sudo apt-get install -y atuin
 }
 
 install_corporate_ca() {
@@ -454,5 +477,25 @@ install_docker_wsl_engine() {
   sudo apt-get update -y
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   sudo usermod -aG docker "$USER" || true
-  warn "Reopen WSL or run newgrp docker before using docker without sudo."
+  if ! sudo systemctl enable --now docker; then
+    die "Docker could not start through systemd. Ensure /etc/wsl.conf contains [boot] systemd=true, run 'wsl --shutdown' from PowerShell, then rerun setup."
+  fi
+  sudo docker version >/dev/null || die "Docker Engine was installed but its daemon is not responding."
+  install_windows_docker_bridge
+  warn "Docker is ready. Start a new shell or run newgrp docker to use it without sudo."
+}
+
+install_windows_docker_bridge() {
+  local distro script windows_script
+  distro="${WSL_DISTRO_NAME:-}"
+  [[ -n "$distro" ]] || { warn "WSL_DISTRO_NAME is unavailable; skipped the PowerShell Docker bridge."; return 0; }
+  need_cmd powershell.exe || { warn "powershell.exe is unavailable; skipped the PowerShell Docker bridge."; return 0; }
+  need_cmd wslpath || { warn "wslpath is unavailable; skipped the PowerShell Docker bridge."; return 0; }
+  script="$DOTFILES_ROOT/windows/install-docker-wsl-profile.ps1"
+  windows_script="$(wslpath -w "$script")"
+  if powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$windows_script" -Distribution "$distro"; then
+    ok "PowerShell docker command now targets Docker Engine in $distro"
+  else
+    warn "Could not configure the PowerShell Docker bridge. Run $script from Windows manually."
+  fi
 }

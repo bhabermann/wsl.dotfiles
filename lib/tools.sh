@@ -7,7 +7,7 @@ MINIMAL_GROUPS=(shell)
 
 tool_description() {
   case "$1" in
-    shell) printf "zsh, Starship, zoxide, fzf, and pinned plugins for a fast interactive shell." ;;
+    shell) printf "Bash and zsh configuration with Starship, zoxide, fzf, and shell plugins." ;;
     modern-cli) printf "Apt-installed search, file listing, readable output, YAML/JSON, GitHub CLI, and tmux tools." ;;
     runtime) printf "mise-managed global Node, Python, Java, .NET, and Go runtimes." ;;
     history) printf "Atuin enhanced searchable shell history." ;;
@@ -33,8 +33,8 @@ tool_label() {
 
 docker_strategy_label() {
   case "$1" in
-    docker-desktop|desktop|1) printf "Docker Desktop" ;;
-    docker-wsl-engine|wsl-engine|2) printf "WSL Docker Engine" ;;
+    docker-wsl-engine|wsl-engine|1) printf "WSL Docker Engine" ;;
+    docker-desktop|desktop|2) printf "Docker Desktop" ;;
     none|3|"") printf "None" ;;
     *) printf "%s" "$1" ;;
   esac
@@ -53,8 +53,8 @@ docker_strategy_from_groups() {
 
 docker_strategy_prompt_default() {
   case "$1" in
-    desktop|docker-desktop|"") printf "1" ;;
-    wsl-engine|docker-wsl-engine) printf "2" ;;
+    wsl-engine|docker-wsl-engine|"") printf "1" ;;
+    desktop|docker-desktop) printf "2" ;;
     none) printf "3" ;;
     *) printf "1" ;;
   esac
@@ -106,15 +106,15 @@ prompt_docker_strategy() {
   default_label="$(docker_strategy_label "$default_choice")"
   {
     section "Docker"
-    printf "  %s1)%s Docker Desktop %s(Recommended)%s - verify Windows Docker Desktop WSL integration.\n" "$C_LABEL" "$C_RESET" "$C_OK" "$C_RESET"
-    printf "  %s2)%s WSL Docker Engine - install Docker inside WSL.\n" "$C_LABEL" "$C_RESET"
+    printf "  %s1)%s WSL Docker Engine %s(Recommended)%s - install Docker inside WSL.\n" "$C_LABEL" "$C_RESET" "$C_OK" "$C_RESET"
+    printf "  %s2)%s Docker Desktop - verify Windows Docker Desktop WSL integration.\n" "$C_LABEL" "$C_RESET"
     printf "  %s3)%s None - skip Docker setup.\n" "$C_LABEL" "$C_RESET"
     printf "  Current default: %s\n" "$default_label"
   } >&2
   choice="$(prompt_choice "Select Docker strategy [default: $default_choice]:" "$default_choice")"
   case "$choice" in
-    1|desktop|DockerDesktop|docker-desktop) printf "desktop" ;;
-    2|wsl|wsl-engine|docker-wsl-engine) printf "wsl-engine" ;;
+    1|wsl|wsl-engine|docker-wsl-engine) printf "wsl-engine" ;;
+    2|desktop|DockerDesktop|docker-desktop) printf "desktop" ;;
     3|none|no|N|n) printf "none" ;;
     *) die "Unknown Docker strategy: $choice" ;;
   esac
@@ -163,7 +163,7 @@ resolve_tool_selection() {
     DOCKER_SELECTION_SOURCE="saved state"
   elif [[ "${NON_INTERACTIVE:-0}" == "1" && -z "$docker_strategy" ]]; then
     case "${TOOLS_PRESET:-recommended}" in
-      recommended|preset|all) docker_strategy="desktop" ;;
+      recommended|preset|all) docker_strategy="wsl-engine" ;;
       minimal) docker_strategy="none" ;;
     esac
     DOCKER_SELECTION_SOURCE="default for ${TOOLS_PRESET:-recommended}"
@@ -191,9 +191,10 @@ resolve_tool_selection() {
       elif [[ "$baseline_source" == "default preset" ]] && is_recommended_group "$group"; then
         default="Y"
       fi
-      local recommended="0"
-      is_recommended_group "$group" && recommended="1"
-      if confirm_aligned "$(tool_label "$group")" "$(tool_description "$group")" "$default" "$recommended"; then
+      local badge=""
+      is_recommended_group "$group" && badge="recommended"
+      [[ "$group" == "history" ]] && badge="optional"
+      if confirm_aligned "$(tool_label "$group")" "$(tool_description "$group")" "$default" "$badge"; then
         printf "%s\n" "$group" >> "$final_file"
       fi
     done
@@ -201,7 +202,7 @@ resolve_tool_selection() {
       section "Work Follow-ups" >&2
       local ca_default="N"
       grep -qx "corporate-ca" "$selected_file" && ca_default="Y"
-      if confirm_aligned "$(tool_label corporate-ca)" "$(tool_description corporate-ca)" "$ca_default" "0"; then
+      if confirm_aligned "$(tool_label corporate-ca)" "$(tool_description corporate-ca)" "$ca_default" ""; then
         printf "%s\n" "corporate-ca" >> "$final_file"
       fi
     fi
@@ -239,11 +240,6 @@ resolve_tool_selection() {
   for group in "${with_items[@]}"; do
     [[ -n "$group" && "$group" != "base" ]] && printf "%s\n" "$group" >> "$final_file"
   done
-
-  if grep -qx "history" "$final_file" && ! grep -qx "runtime" "$final_file"; then
-    warn "history selected; runtime will be installed because Atuin requires mise."
-    printf "runtime\n" >> "$final_file"
-  fi
 
   : > "$ordered_file"
   for group in "${INSTALL_ORDER[@]}"; do
