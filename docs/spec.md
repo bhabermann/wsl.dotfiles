@@ -26,7 +26,7 @@
 | --- | --- | --- |
 | shell | recommended | zsh, Starship, zoxide, fzf, completions, suggestions, and highlighting |
 | modern-cli | recommended | apt-installed ripgrep, fd, bat, eza, jq, yq, gh, tree, and tmux |
-| runtime | recommended | mise-managed global Node, Python, Java, .NET, and Go |
+| runtime | recommended | mise-managed global Node, .NET, Python, Go, uv, and Java |
 | history | optional | Atuin searchable shell history |
 | corporate-ca | explicit work opt-in | Capture configured corporate TLS interception CA chains and install only allowlisted CA certificates |
 
@@ -39,8 +39,10 @@ base` flags are accepted as no-ops and are not persisted.
 Ubuntu apt owns WSL system tools and general CLIs, including Starship, Atuin,
 zsh autosuggestions, and syntax highlighting. mise is installed from its
 official Ubuntu 26.04 PPA and is reserved for global developer language
-runtimes and project version switching for `node`, `python`, `java`, `dotnet`,
-and `go`. `zsh-completions` is the only Git-installed shell exception because
+runtimes and project version switching for `node`, `dotnet`, `python`, `go`,
+`uv`, and `java`. The managed defaults are `node@24.17.0`,
+`dotnet@10.0.301`, `python@3.13.14`, `go@1.26.3`, `uv@0.11.21`, and
+`java@21`. `zsh-completions` is the only Git-installed shell exception because
 Ubuntu 26.04 does not package it.
 
 Docker is not a tool group prompt. It is one mutually exclusive strategy:

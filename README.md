@@ -103,7 +103,7 @@ Recommended groups:
 
 - `shell`: zsh, prompt, navigation, fuzzy search, and plugins.
 - `modern-cli`: apt-installed search/listing/readability tools, GitHub CLI, YAML/JSON tools, and tmux.
-- `runtime`: mise-managed global language runtimes.
+- `runtime`: mise-managed global `node@24.17.0`, `dotnet@10.0.301`, `python@3.13.14`, `go@1.26.3`, `uv@0.11.21`, and `java@21`.
 
 Optional groups:
 
@@ -126,7 +126,9 @@ history, completion, hooks, plugins, and prompt setup remain separate.
 
 mise is installed from its official Ubuntu 26.04 PPA and owns globally
 available developer language runtimes and project version switching for
-`node`, `python`, `java`, `dotnet`, and `go`. The installer links
+`node`, `dotnet`, `python`, `go`, `uv`, and `java`. The managed defaults are
+`node@24.17.0`, `dotnet@10.0.301`, `python@3.13.14`, `go@1.26.3`,
+`uv@0.11.21`, and `java@21`. The installer links
 the global mise config into `~/.config/mise/`, keeps `~/.local/bin` and
 `~/.local/share/mise/shims` on `PATH`, and activates mise from zsh.
 

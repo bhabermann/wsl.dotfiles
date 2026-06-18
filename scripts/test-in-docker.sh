@@ -21,7 +21,7 @@ grep -q "libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata" install/install.sh
 grep -q "bash-completion util-linux-extra" install/install.sh
 grep -q "newgrp docker" scripts/test-docker.sh
 ! grep -q "sg docker" scripts/test-docker.sh
-grep -q 'exec dotnet@8 -- dotnet --version' install/install.sh
+grep -q '"\$mise_cmd" where "\$tool@\$version"' install/install.sh
 ! grep -q "https://mise.run" install/install.sh
 ! grep -q "starship/releases" install/install.sh
 ! grep -q "zsh-autosuggestions" install/plugins.sh
@@ -31,11 +31,12 @@ grep -q "zsh-completions" install/plugins.sh
 ! grep -Eq 'mise use -g .*yq' install/install.sh
 grep -q 'default_tools_file="\$DOTFILES_ROOT/mise/default-tools.toml"' install/install.sh
 grep -q '"\$mise_cmd" use -g "\$tool@\$version"' install/install.sh
-grep -q 'node = "lts"' mise/default-tools.toml
-grep -q 'python = "latest"' mise/default-tools.toml
+grep -q 'node = "24.17.0"' mise/default-tools.toml
+grep -q 'python = "3.13.14"' mise/default-tools.toml
 grep -q 'java = "21"' mise/default-tools.toml
-grep -q 'dotnet = "8"' mise/default-tools.toml
-grep -q 'go = "latest"' mise/default-tools.toml
+grep -q 'dotnet = "10.0.301"' mise/default-tools.toml
+grep -q 'go = "1.26.3"' mise/default-tools.toml
+grep -q 'uv = "0.11.21"' mise/default-tools.toml
 ! grep -Eq '^(zoxide|eza|bat|ripgrep|fd|jq|yq) =' mise/default-tools.toml
 ! grep -Eq '^(atuin|eza|yq) =' mise/config.toml
 

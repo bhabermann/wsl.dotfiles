@@ -9,7 +9,7 @@ tool_description() {
   case "$1" in
     shell) printf "Bash and zsh configuration with Starship, zoxide, fzf, and shell plugins." ;;
     modern-cli) printf "Apt-installed search, file listing, readable output, YAML/JSON, GitHub CLI, and tmux tools." ;;
-    runtime) printf "mise-managed global Node, Python, Java, .NET, and Go runtimes." ;;
+    runtime) printf "mise-managed global Node, .NET, Python, Go, uv, and Java runtimes." ;;
     history) printf "Atuin enhanced searchable shell history." ;;
     docker-desktop) printf "Verify Windows Docker Desktop integration with this WSL distro." ;;
     docker-wsl-engine) printf "Install Docker Engine inside WSL with systemd and Windows wrappers." ;;

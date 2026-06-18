@@ -1,10 +1,11 @@
 [settings]
 experimental = true
-idiomatic_version_file_enable_tools = ["node", "python", "java", "go"]
+idiomatic_version_file_enable_tools = ["node", "python", "java", "dotnet", "go", "uv"]
 
 [tools]
-dotnet = "8"
-go = "latest"
+node = "24.17.0"
+dotnet = "10.0.301"
+python = "3.13.14"
+go = "1.26.3"
+uv = "0.11.21"
 java = "21"
-node = "lts"
-python = "latest"

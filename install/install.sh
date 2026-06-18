@@ -330,9 +330,13 @@ install_runtime() {
     "$mise_cmd" use -g "$tool@$version"
   done
   "$mise_cmd" install
-  if ! "$mise_cmd" exec dotnet@8 -- dotnet --version >/dev/null; then
-    die "mise installed .NET, but dotnet could not start. Verify the Ubuntu runtime dependencies, especially libicu78 and libssl3t64."
-  fi
+  for pair in "${runtime_pairs[@]}"; do
+    tool="${pair%%$'\t'*}"
+    version="${pair#*$'\t'}"
+    if ! "$mise_cmd" where "$tool@$version" >/dev/null 2>&1; then
+      die "mise did not install $tool@$version as configured."
+    fi
+  done
 }
 
 read_mise_default_tools() {
