@@ -7,6 +7,14 @@ secrets, and overrides outside the repository.
 
 ## Quick Start
 
+Bootstrap from a fresh Ubuntu shell with one command:
+
+```bash
+git clone https://github.com/bhabermann/wsl.dotfiles.git ~/.dotfiles && cd ~/.dotfiles && ./setup install
+```
+
+Or use the step-by-step form:
+
 ```bash
 git clone https://github.com/bhabermann/wsl.dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
@@ -122,7 +130,9 @@ Both Bash and Zsh are configured regardless of the selected login shell. Setup
 keeps `~/.bashrc` and `~/.zshrc` as regular user-owned files and maintains one
 small source block in each. Shared environment, PATH, aliases, profile loading,
 and local overrides live under `~/.config/dotfiles/shell/`; shell-specific
-history, completion, hooks, plugins, and prompt setup remain separate.
+history, completion, hooks, plugins, and prompt setup remain separate. Rerunning
+setup repairs missing or malformed managed source blocks while preserving user
+content outside those blocks.
 
 mise is installed from its official Ubuntu 26.04 PPA and owns globally
 available developer language runtimes and project version switching for
@@ -130,7 +140,9 @@ available developer language runtimes and project version switching for
 `node@24.17.0`, `dotnet@10.0.301`, `python@3.13.14`, `go@1.26.3`,
 `uv@0.11.21`, and `java@21`. The installer links
 the global mise config into `~/.config/mise/`, keeps `~/.local/bin` and
-`~/.local/share/mise/shims` on `PATH`, and activates mise from zsh.
+`~/.local/share/mise/shims` on `PATH`, activates mise from both Bash and Zsh,
+and installs the managed global toolchain during setup so new shells should not
+require a manual `mise install`.
 
 Docker is selected with one strategy prompt:
 
@@ -225,6 +237,9 @@ Docker Engine must be running inside WSL. Setup enables its systemd service and
 adds a managed PowerShell `docker` function that forwards to this WSL distro.
 The test script uses `docker` when available
 and can still fall back to `docker.exe` when Docker Desktop integration is used.
+If Docker group membership was added during setup but the current shell session
+is stale, the Docker test wrapper re-enters through `newgrp docker` so the test
+command can run without requiring a manual logout/login cycle first.
 
 The pipeline builds `Dockerfile.test` with Ubuntu 26.04 and runs:
 
