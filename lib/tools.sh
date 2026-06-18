@@ -153,6 +153,9 @@ resolve_tool_selection() {
       baseline_source="default preset"
     fi
   fi
+  if [[ "${PROFILE:-}" == "work" ]] && ! grep -qx "corporate-ca" "$selected_file"; then
+    printf "%s\n" "corporate-ca" >> "$selected_file"
+  fi
   mapfile -t saved_groups < "$selected_file"
 
   docker_strategy="${DOCKER_STRATEGY:-}"

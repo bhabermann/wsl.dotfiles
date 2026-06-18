@@ -386,7 +386,6 @@ HOME=/tmp/dotfiles-work-ca-home ./setup install \
   --git-name "Work CA" \
   --git-email workca@example.com \
   --tools minimal \
-  --with corporate-ca \
   --docker none \
   --default-shell unchanged 2>&1 | tee /tmp/setup-work-ca.txt
 

@@ -116,7 +116,9 @@ Recommended groups:
 Optional groups:
 
 - `history`: Atuin.
-- `corporate-ca`: work-profile follow-up for corporate TLS interception CAs.
+- `corporate-ca`: work-profile CA refresh for corporate TLS interception CAs.
+
+Work profile installs include `corporate-ca` automatically on the first run.
 
 ## Package Policy
 
@@ -175,12 +177,14 @@ The installer creates local files only when missing.
 
 ## When Corporate CA Is Needed
 
-Some corporate networks intercept TLS and present a company-controlled CA. If
-tools such as `curl`, `git`, `mise`, `npm`, package installers, or Docker setup
-fail with certificate verification errors on the work network, opt in explicitly:
+Some corporate networks intercept TLS and present a company-controlled CA. The
+work profile now includes this refresh on the first install. If tools such as
+`curl`, `git`, `mise`, `npm`, package installers, or Docker setup still fail
+with certificate verification errors on the work network, set up
+`~/.config/dotfiles/corporate-ca.env` and rerun the refresh:
 
 ```bash
-./setup install --profile work --with corporate-ca
+./scripts/update-corporate-ca --config ~/.config/dotfiles/corporate-ca.env
 ```
 
 The installer copies

@@ -36,7 +36,7 @@ action_doctor() {
   item "Runtime tools are handled when Runtime is selected."
   item "If WSL Docker Engine is selected and docker is unavailable, rerun: ./setup install --docker wsl-engine"
   if [[ "$profile" == "work" ]]; then
-    item "If curl, git, mise, npm, package installers, or Docker setup report TLS certificate errors on the corporate network, configure $DOTFILES_CONFIG_DIR/corporate-ca.env and rerun: ./setup install --profile work --with corporate-ca"
+    item "Work installs include corporate CA refresh by default. If curl, git, mise, npm, package installers, or Docker setup still report TLS certificate errors on the corporate network, configure $DOTFILES_CONFIG_DIR/corporate-ca.env and rerun: ./scripts/update-corporate-ca --config $DOTFILES_CONFIG_DIR/corporate-ca.env"
   fi
   item "To preview changes before rerunning, use: ./setup install --dry-run"
 }
