@@ -170,6 +170,7 @@ TEST_URLS=()
 EOF
 ./scripts/update-corporate-ca --config "$ca_config" --print-config >/tmp/update-corporate-ca-config.txt
 grep -q "127.0.0.1" /tmp/update-corporate-ca-config.txt
+grep -q "mise-versions.jdx.dev" /tmp/update-corporate-ca-config.txt
 ./scripts/update-corporate-ca --config "$ca_config" --dry-run >/tmp/update-corporate-ca-dry-run.txt 2>&1
 grep -q "Dry-run completed" /tmp/update-corporate-ca-dry-run.txt
 HOME=/tmp/dotfiles-missing-ca-home ./scripts/update-corporate-ca --print-config >/tmp/update-corporate-ca-missing.txt 2>&1

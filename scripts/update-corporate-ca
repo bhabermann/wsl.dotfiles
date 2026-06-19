@@ -143,19 +143,28 @@ load_config() {
 }
 
 apply_config_defaults() {
-  if [[ "${#HOSTS[@]}" -eq 0 ]]; then
-    HOSTS=("${DEFAULT_HOSTS[@]}")
-    debug "HOSTS is empty; using built-in defaults."
-  fi
-  if [[ "${#TEST_URLS[@]}" -eq 0 ]]; then
-    TEST_URLS=("${DEFAULT_TEST_URLS[@]}")
-    debug "TEST_URLS is empty; using built-in defaults."
-  fi
-  if [[ "${#WINDOWS_CERT_STORES[@]}" -eq 0 ]]; then
-    WINDOWS_CERT_STORES=("${DEFAULT_WINDOWS_CERT_STORES[@]}")
-    debug "WINDOWS_CERT_STORES is empty; using built-in defaults."
-  fi
+  merge_defaults HOSTS DEFAULT_HOSTS
+  merge_defaults TEST_URLS DEFAULT_TEST_URLS
+  merge_defaults WINDOWS_CERT_STORES DEFAULT_WINDOWS_CERT_STORES
   WINDOWS_TRUSTED_ISSUER_IMPORT="${WINDOWS_TRUSTED_ISSUER_IMPORT:-1}"
+}
+
+merge_defaults() {
+  local target_name="$1" defaults_name="$2" item
+  local -n target_ref="$target_name"
+  local -n defaults_ref="$defaults_name"
+  for item in "${defaults_ref[@]}"; do
+    contains_value "$item" "${target_ref[@]}" || target_ref+=("$item")
+  done
+}
+
+contains_value() {
+  local needle="$1" item
+  shift
+  for item in "$@"; do
+    [[ "$item" == "$needle" ]] && return 0
+  done
+  return 1
 }
 
 print_config() {
@@ -356,9 +365,9 @@ fetch_and_install_from_hosts() {
 
 fetch_and_install_from_windows_store() {
   [[ "$WINDOWS_TRUSTED_ISSUER_IMPORT" == "1" ]] || return 0
-  is_wsl || return 0
-  command -v powershell.exe >/dev/null 2>&1 || { debug "powershell.exe unavailable; skipped Windows certificate store import."; return 0; }
-  command -v wslpath >/dev/null 2>&1 || { debug "wslpath unavailable; skipped Windows certificate store import."; return 0; }
+  is_wsl || { warn "Windows certificate store import is unavailable outside WSL. If this is a container, install the required CA inside the container image or provide a local allowlist config."; return 0; }
+  command -v powershell.exe >/dev/null 2>&1 || { warn "powershell.exe is unavailable; skipped Windows certificate store import."; return 0; }
+  command -v wslpath >/dev/null 2>&1 || { warn "wslpath is unavailable; skipped Windows certificate store import."; return 0; }
 
   log "Checking Windows certificate stores for trusted issuers."
   local export_dir="$WORKDIR/windows-certs"
@@ -387,14 +396,21 @@ foreach ($store in $Stores) {
   }
   Get-ChildItem -LiteralPath $store |
     ForEach-Object {
-      $basicConstraints = $_.Extensions |
-        Where-Object { $_.Oid.Value -eq "2.5.29.19" } |
-        Select-Object -First 1
-      if ($null -eq $basicConstraints -or $basicConstraints.Format($false) -notmatch "Subject Type=CA") {
-        return
+      $isCa = $false
+      foreach ($extension in $_.Extensions) {
+        if ($extension -is [System.Security.Cryptography.X509Certificates.X509BasicConstraintsExtension]) {
+          $isCa = $extension.CertificateAuthority
+          break
+        }
+        if ($extension.Oid.Value -eq "2.5.29.19" -and $extension.Format($false) -match "Subject Type=CA") {
+          $isCa = $true
+          break
+        }
       }
-      $path = Join-Path $OutDir ("windows-ca-" + $_.Thumbprint + ".cer")
-      Export-Certificate -Cert $_ -FilePath $path -Type CERT | Out-Null
+      if ($isCa) {
+        $path = Join-Path $OutDir ("windows-ca-" + $_.Thumbprint + ".cer")
+        Export-Certificate -Cert $_ -FilePath $path -Type CERT | Out-Null
+      }
     }
 }
 PWSH
