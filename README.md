@@ -216,21 +216,35 @@ Preview the refresh without changing system trust:
 ./scripts/update-corporate-ca --config ~/.config/dotfiles/corporate-ca.env --dry-run
 ```
 
-## Windows Bootstrap
+## Windows Integration
 
-From PowerShell:
+This project focuses on WSL2 Ubuntu environment setup. For Windows-side integration:
 
-```powershell
-.\windows\install.ps1
-```
-
-Non-interactive example:
+### Docker from Windows PowerShell
+To use Docker from Windows PowerShell after installing Docker Engine in WSL:
 
 ```powershell
-.\windows\install.ps1 -NonInteractive -Preset Recommended
+# From Windows PowerShell
+wsl -d Ubuntu-26.04 docker ps
 ```
 
-The Windows bootstrap uses winget and asks about each tool by default.
+For full Windows Docker integration, see: https://docs.docker.com/engine/install/wsl/
+
+### Windows Terminal
+Install Windows Terminal for the best WSL experience:
+```powershell
+winget install Microsoft.WindowsTerminal
+```
+
+### Corporate CA Certificates
+If your network uses TLS interception, you may need to import corporate CA certificates into Windows. Run this from Windows PowerShell (requires admin rights):
+
+```powershell
+# Import corporate CA into Windows trust store
+certutil -addstore -f "ROOT" "path\to\corporate-ca.crt"
+```
+
+The WSL setup includes automatic CA certificate handling for Linux. Windows-side certificate import is manual and optional.
 
 ## Docker
 

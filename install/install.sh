@@ -596,21 +596,7 @@ install_docker_wsl_engine() {
     die "Docker could not start through systemd. Ensure /etc/wsl.conf contains [boot] systemd=true, run 'wsl --shutdown' from PowerShell, then rerun setup."
   fi
   sudo docker version >/dev/null || die "Docker Engine was installed but its daemon is not responding."
-  install_windows_docker_bridge
+  hint "To use Docker from Windows PowerShell, run: wsl -d $WSL_DISTRO_NAME docker ps"
+  hint "For Windows Docker integration, see: https://docs.docker.com/engine/install/wsl/"
   warn "Docker is ready. Start a new shell or run newgrp docker to use it without sudo."
-}
-
-install_windows_docker_bridge() {
-  local distro script windows_script
-  distro="${WSL_DISTRO_NAME:-}"
-  [[ -n "$distro" ]] || { warn "WSL_DISTRO_NAME is unavailable; skipped the PowerShell Docker bridge."; return 0; }
-  need_cmd powershell.exe || { warn "powershell.exe is unavailable; skipped the PowerShell Docker bridge."; return 0; }
-  need_cmd wslpath || { warn "wslpath is unavailable; skipped the PowerShell Docker bridge."; return 0; }
-  script="$DOTFILES_ROOT/windows/install-docker-wsl-profile.ps1"
-  windows_script="$(wslpath -w "$script")"
-  if powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$windows_script" -Distribution "$distro"; then
-    ok "PowerShell docker command now targets Docker Engine in $distro"
-  else
-    warn "Could not configure the PowerShell Docker bridge. Run $script from Windows manually."
-  fi
 }

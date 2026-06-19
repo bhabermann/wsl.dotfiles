@@ -29,7 +29,6 @@ link_file "$DOTFILES_ROOT/scripts/wslview" "$HOME/.local/bin/wslview"
 
 copy_template_if_missing "$DOTFILES_ROOT/templates/git/identity.gitconfig.template" "$HOME/.config/git/identity.gitconfig"
 if [[ "$ONLY_MISE" == "0" && "${GIT_IDENTITY_WRITE:-0}" == "1" && -n "${GIT_NAME:-}" && -n "${GIT_EMAIL:-}" ]]; then
-  local current_name current_email
   current_name="$(git config --file "$HOME/.config/git/identity.gitconfig" --get user.name 2>/dev/null || true)"
   current_email="$(git config --file "$HOME/.config/git/identity.gitconfig" --get user.email 2>/dev/null || true)"
   if [[ "$current_name" != "$GIT_NAME" || "$current_email" != "$GIT_EMAIL" ]]; then

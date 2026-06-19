@@ -372,9 +372,9 @@ fetch_and_install_from_hosts() {
 
 fetch_and_install_from_windows_store() {
   [[ "$WINDOWS_TRUSTED_ISSUER_IMPORT" == "1" ]] || return 0
-  is_wsl || { warn "Windows certificate store import is unavailable outside WSL. If this is a container, install the required CA inside the container image or provide a local allowlist config."; return 0; }
-  command -v powershell.exe >/dev/null 2>&1 || { warn "powershell.exe is unavailable; skipped Windows certificate store import."; return 0; }
-  command -v wslpath >/dev/null 2>&1 || { warn "wslpath is unavailable; skipped Windows certificate store import."; return 0; }
+  is_wsl || { debug "Windows certificate store import is unavailable outside WSL."; return 0; }
+  command -v powershell.exe >/dev/null 2>&1 || { debug "powershell.exe is unavailable; skipped Windows certificate store import."; return 0; }
+  command -v wslpath >/dev/null 2>&1 || { debug "wslpath is unavailable; skipped Windows certificate store import."; return 0; }
 
   log "Checking Windows certificate stores for trusted issuers."
   local export_dir="$WORKDIR/windows-certs"
@@ -422,8 +422,9 @@ foreach ($store in $Stores) {
 }
 PWSH
 
-  if ! powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$ps_script")" "$(wslpath -w "$export_dir")" "${store_args[@]}" >/dev/null; then
-    warn "Could not export CA certificates from Windows certificate stores."
+  if ! powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$ps_script")" "$(wslpath -w "$export_dir")" "${store_args[@]}" 2>&1; then
+    debug "Could not export CA certificates from Windows certificate stores (possibly due to execution policy)."
+    debug "Windows certificate import is optional. CA certificates will be fetched from host chains instead."
     return 0
   fi
 
