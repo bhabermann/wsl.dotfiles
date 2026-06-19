@@ -83,6 +83,7 @@ action_install() {
   printf "%s\n" "$PROFILE" > "$DOTFILES_CONFIG_DIR/profile"
   printf "%s\n" "${selected_groups[@]}" > "$DOTFILES_CONFIG_DIR/selected-tools"
   printf "%s\n" "$default_shell_choice" > "$DOTFILES_CONFIG_DIR/default-shell"
+  save_git_identity
 
   section "Installation"
   install_dependency_setup
@@ -158,6 +159,32 @@ resolve_git_identity() {
     GIT_IDENTITY_STATUS="will create $identity_file as $GIT_NAME <$GIT_EMAIL>"
   fi
   export GIT_NAME GIT_EMAIL GIT_IDENTITY_WRITE GIT_IDENTITY_STATUS
+}
+
+save_git_identity() {
+  local identity_file="$HOME/.config/git/identity.gitconfig"
+  
+  if [[ "${GIT_IDENTITY_WRITE:-0}" != "1" ]]; then
+    return 0
+  fi
+  
+  if [[ -z "${GIT_NAME:-}" || -z "${GIT_EMAIL:-}" ]]; then
+    return 0
+  fi
+  
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    ok "DRY-RUN: Would create git identity file"
+    return 0
+  fi
+  
+  mkdir -p "$HOME/.config/git"
+  if [[ ! -f "$identity_file" ]]; then
+    copy_template_if_missing "$DOTFILES_ROOT/templates/git/identity.gitconfig.template" "$identity_file"
+  fi
+  
+  git config --file "$identity_file" user.name "$GIT_NAME"
+  git config --file "$identity_file" user.email "$GIT_EMAIL"
+  ok "Saved git identity to $identity_file"
 }
 
 resolve_default_shell() {

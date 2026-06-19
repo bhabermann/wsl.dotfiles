@@ -28,9 +28,15 @@ mkdir -p "$HOME/.local/bin"
 link_file "$DOTFILES_ROOT/scripts/wslview" "$HOME/.local/bin/wslview"
 
 copy_template_if_missing "$DOTFILES_ROOT/templates/git/identity.gitconfig.template" "$HOME/.config/git/identity.gitconfig"
-if [[ "${GIT_IDENTITY_WRITE:-0}" == "1" && -n "${GIT_NAME:-}" && -n "${GIT_EMAIL:-}" ]]; then
-  git config --file "$HOME/.config/git/identity.gitconfig" user.name "$GIT_NAME"
-  git config --file "$HOME/.config/git/identity.gitconfig" user.email "$GIT_EMAIL"
+if [[ "$ONLY_MISE" == "0" && "${GIT_IDENTITY_WRITE:-0}" == "1" && -n "${GIT_NAME:-}" && -n "${GIT_EMAIL:-}" ]]; then
+  local current_name current_email
+  current_name="$(git config --file "$HOME/.config/git/identity.gitconfig" --get user.name 2>/dev/null || true)"
+  current_email="$(git config --file "$HOME/.config/git/identity.gitconfig" --get user.email 2>/dev/null || true)"
+  if [[ "$current_name" != "$GIT_NAME" || "$current_email" != "$GIT_EMAIL" ]]; then
+    git config --file "$HOME/.config/git/identity.gitconfig" user.name "$GIT_NAME"
+    git config --file "$HOME/.config/git/identity.gitconfig" user.email "$GIT_EMAIL"
+    ok "Updated git identity in $HOME/.config/git/identity.gitconfig"
+  fi
 fi
 
 mkdir -p "$HOME/.ssh"

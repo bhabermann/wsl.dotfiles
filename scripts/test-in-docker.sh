@@ -28,6 +28,7 @@ grep -q "BEGIN DOTFILES MANAGED" templates/dotfiles/corporate-ca.env.template
 grep -q "END DOTFILES MANAGED" templates/dotfiles/corporate-ca.env.template
 grep -q "copy_or_update_template_with_markers" lib/common.sh
 grep -q "validate_managed_markers" lib/common.sh
+grep -q "save_git_identity" install/install.sh
 grep -q "bash-completion util-linux-extra" install/install.sh
 grep -q "newgrp docker" scripts/test-docker.sh
 ! grep -q "sg docker" scripts/test-docker.sh
