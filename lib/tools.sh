@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ALL_GROUPS=(shell runtime history modern-cli)
-INSTALL_ORDER=(runtime shell history modern-cli docker-desktop docker-wsl-engine corporate-ca)
+INSTALL_ORDER=(corporate-ca runtime shell history modern-cli docker-desktop docker-wsl-engine)
 RECOMMENDED_GROUPS=(shell runtime modern-cli)
 MINIMAL_GROUPS=(shell)
 

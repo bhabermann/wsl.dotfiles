@@ -51,9 +51,10 @@ Docker is not a tool group prompt. It is one mutually exclusive strategy:
 - `desktop`: optional Docker Desktop WSL integration check.
 - `none`: skip Docker setup.
 
-Corporate CA support is never selected by presets. Interactive installs only ask
-for it as a work-profile follow-up, defaulting to no. Non-interactive installs
-must pass `--with corporate-ca`.
+Corporate CA support is selected automatically for work-profile installs.
+Interactive installs still show it as a work-profile follow-up. Personal
+installs must pass `--with corporate-ca` when a local TLS interception CA is
+needed.
 
 `./setup verify` remains a diagnostic command. Reconfigure defaults come from
 persisted setup state, not live command detection.

@@ -17,6 +17,7 @@ grep -q "apt-get install -y ripgrep fd-find bat tree tmux jq gh eza yq" install/
 grep -q "apt-get install -y atuin" install/install.sh
 grep -q "add-apt-repository -y ppa:jdxcode/mise" install/install.sh
 grep -q "apt-get install -y mise" install/install.sh
+grep -q "INSTALL_ORDER=(corporate-ca runtime shell history modern-cli docker-desktop docker-wsl-engine)" lib/tools.sh
 grep -q "libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata" install/install.sh
 grep -q "bash-completion util-linux-extra" install/install.sh
 grep -q "newgrp docker" scripts/test-docker.sh
@@ -386,10 +387,14 @@ HOME=/tmp/dotfiles-work-ca-home ./setup install \
   --git-name "Work CA" \
   --git-email workca@example.com \
   --tools minimal \
+  --with runtime \
   --docker none \
   --default-shell unchanged 2>&1 | tee /tmp/setup-work-ca.txt
 
 grep -q "Corporate CA" /tmp/setup-work-ca.txt
+ca_line="$(grep -n "Preparing corporate CA refresh" /tmp/setup-work-ca.txt | cut -d: -f1 | head -n1)"
+runtime_line="$(grep -n "Installing mise and runtimes" /tmp/setup-work-ca.txt | cut -d: -f1 | head -n1)"
+test "$ca_line" -lt "$runtime_line"
 grep -q "DOTFILES_TEST_MODE: skipped corporate CA refresh" /tmp/setup-work-ca.txt
 test -f /tmp/dotfiles-work-ca-home/.config/dotfiles/corporate-ca.env
 grep -qx "corporate-ca" /tmp/dotfiles-work-ca-home/.config/dotfiles/selected-tools

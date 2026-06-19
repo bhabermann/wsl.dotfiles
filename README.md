@@ -193,6 +193,12 @@ The installer copies
 URLs, and the subject/issuer allowlist regex there. The repository intentionally
 does not include company-specific hosts or certificate authority names.
 
+On WSL, the refresh also checks allowlisted Windows certificate stores such as
+`Cert:\LocalMachine\Root` and `Cert:\CurrentUser\Root`. This handles the common
+case where the corporate root CA is trusted by Windows but not yet installed in
+Ubuntu, which can otherwise break tools like `mise` with `unable to get local
+issuer certificate`.
+
 Preview the refresh without changing system trust:
 
 ```bash

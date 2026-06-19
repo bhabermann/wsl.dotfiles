@@ -10,6 +10,12 @@ WORKDIR="$(mktemp -d /tmp/update-corporate-ca.XXXXXX)"
 
 HOSTS=()
 TEST_URLS=()
+WINDOWS_CERT_STORES=(
+  "Cert:\\LocalMachine\\Root"
+  "Cert:\\LocalMachine\\CA"
+  "Cert:\\CurrentUser\\Root"
+  "Cert:\\CurrentUser\\CA"
+)
 ALLOWLIST_REGEX=""
 CURL_CONNECT_TIMEOUT="8"
 CURL_MAX_TIME="20"
@@ -81,6 +87,7 @@ Options:
 Notes:
   - Keep company-specific hosts, URLs, and allowlists in local config only.
   - Only certificates with CA:TRUE and Subject or Issuer matching ALLOWLIST_REGEX are installed.
+  - On WSL, matching CA certificates are also imported from Windows trust stores when powershell.exe is available.
   - Run as a normal user; sudo is used only when updating system trust.
 EOF
 }
@@ -127,6 +134,8 @@ print_config() {
   for host in "${HOSTS[@]}"; do log "    - $host"; done
   log "  TEST_URLS            ="
   for url in "${TEST_URLS[@]}"; do log "    - $url"; done
+  log "  WINDOWS_CERT_STORES  ="
+  for store in "${WINDOWS_CERT_STORES[@]}"; do log "    - $store"; done
 }
 
 validate_config() {
@@ -197,6 +206,10 @@ install_cert_pem() {
   log "  Expires: $exp"
 }
 
+is_wsl() {
+  [[ -n "${WSL_INTEROP:-}" ]] || [[ -e /proc/sys/fs/binfmt_misc/WSLInterop ]]
+}
+
 cleanup_installed_certs() {
   log "Cleanup requested: removing certificates installed by this tool."
   local pattern="$CERT_DIR/${CERT_PREFIX}"'*.crt'
@@ -260,6 +273,82 @@ fetch_and_install_from_hosts() {
   fi
 }
 
+fetch_and_install_from_windows_store() {
+  is_wsl || return 0
+  command -v powershell.exe >/dev/null 2>&1 || { debug "powershell.exe unavailable; skipped Windows certificate store import."; return 0; }
+  command -v wslpath >/dev/null 2>&1 || { debug "wslpath unavailable; skipped Windows certificate store import."; return 0; }
+
+  log "Checking Windows certificate stores for allowlisted CA certificates."
+  local export_dir="$WORKDIR/windows-certs"
+  mkdir -p "$export_dir"
+
+  local store_args=()
+  local store
+  for store in "${WINDOWS_CERT_STORES[@]}"; do
+    [[ -n "$store" ]] && store_args+=("$store")
+  done
+  [[ "${#store_args[@]}" -gt 0 ]] || return 0
+
+  local ps_script="$WORKDIR/export-windows-ca.ps1"
+  cat > "$ps_script" <<'PWSH'
+param(
+  [Parameter(Mandatory = $true)][string]$OutDir,
+  [Parameter(Mandatory = $true)][string]$AllowlistRegex,
+  [Parameter(ValueFromRemainingArguments = $true)][string[]]$Stores
+)
+
+$ErrorActionPreference = "Stop"
+New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+foreach ($store in $Stores) {
+  if (-not (Test-Path -LiteralPath $store)) {
+    continue
+  }
+  Get-ChildItem -LiteralPath $store |
+    Where-Object {
+      $_.Subject -match $AllowlistRegex -or $_.Issuer -match $AllowlistRegex
+    } |
+    ForEach-Object {
+      $basicConstraints = $_.Extensions |
+        Where-Object { $_.Oid.Value -eq "2.5.29.19" } |
+        Select-Object -First 1
+      if ($null -eq $basicConstraints -or $basicConstraints.Format($false) -notmatch "Subject Type=CA") {
+        return
+      }
+      $path = Join-Path $OutDir ("windows-ca-" + $_.Thumbprint + ".cer")
+      Export-Certificate -Cert $_ -FilePath $path -Type CERT | Out-Null
+    }
+}
+PWSH
+
+  if ! powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$ps_script")" "$(wslpath -w "$export_dir")" "$ALLOWLIST_REGEX" "${store_args[@]}" >/dev/null; then
+    warn "Could not export allowlisted CA certificates from Windows certificate stores."
+    return 0
+  fi
+
+  local installed=0 cert pem
+  for cert in "$export_dir"/*.cer; do
+    [[ -f "$cert" ]] || continue
+    pem="$cert.pem"
+    if ! openssl x509 -inform DER -in "$cert" -out "$pem" 2>/dev/null; then
+      debug "Skipping Windows certificate that could not be converted: $cert"
+      continue
+    fi
+    is_valid_x509 "$pem" || continue
+    is_ca_true "$pem" || { debug "Skipping non-CA Windows certificate: $(subject_line "$pem")"; continue; }
+    matches_allowlist "$pem" || { debug "Skipping Windows CA not matching allowlist: $(subject_line "$pem")"; continue; }
+    install_cert_pem "$pem" && installed=$((installed + 1))
+  done
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "Dry-run: Windows certificate store stage completed."
+  elif [[ "$installed" -gt 0 ]]; then
+    sudo update-ca-certificates
+  else
+    debug "No allowlisted Windows CA certificates were installed."
+  fi
+}
+
 curl_test_url() {
   local url="$1" out rc code
   out="$(curl -sS -L --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME" \
@@ -305,6 +394,7 @@ main() {
     exit 0
   fi
 
+  fetch_and_install_from_windows_store
   fetch_and_install_from_hosts
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
