@@ -322,6 +322,8 @@ install_runtime() {
   [[ -z "$mise_cmd" && -x "$HOME/.local/bin/mise" ]] && mise_cmd="$HOME/.local/bin/mise"
   [[ -n "$mise_cmd" ]] || die "mise installation did not provide a usable binary."
   "$mise_cmd" trust "$DOTFILES_ROOT" >/dev/null 2>&1 || true
+  configure_runtime_ca_bundle
+  ensure_mise_versions_https
 
   local default_tools_file runtime_pairs pair tool version
   default_tools_file="$DOTFILES_ROOT/mise/default-tools.toml"
@@ -339,6 +341,67 @@ install_runtime() {
       die "mise did not install $tool@$version as configured."
     fi
   done
+}
+
+configure_runtime_ca_bundle() {
+  local ca_bundle="/etc/ssl/certs/ca-certificates.crt"
+  [[ -f "$ca_bundle" ]] || die "Missing Linux CA bundle: $ca_bundle"
+  export SSL_CERT_FILE="$ca_bundle"
+  export CURL_CA_BUNDLE="$ca_bundle"
+  export REQUESTS_CA_BUNDLE="$ca_bundle"
+}
+
+ensure_mise_versions_https() {
+  local urls url err_file failed_url
+  urls=(
+    "${MISE_VERSIONS_TEST_URL:-https://mise-versions.jdx.dev/data/go.toml}"
+    "${MISE_PYTHON_PRECOMPILED_TEST_URL:-https://mise-versions.jdx.dev/tools/python-precompiled-x86_64-unknown-linux-gnu.gz}"
+  )
+  err_file="$(mktemp)"
+
+  if test_mise_versions_urls "$err_file" "${urls[@]}"; then
+    rm -f "$err_file"
+    ok "mise versions HTTPS preflight"
+    return 0
+  fi
+  failed_url="$(head -n 1 "$err_file" 2>/dev/null || true)"
+
+  if grep -qiE "certificate|SSL|TLS|unable to get local issuer" "$err_file"; then
+    warn "mise versions HTTPS preflight failed TLS verification; refreshing CA trust before retry"
+    run_corporate_ca_refresh "mise HTTPS preflight"
+    : > "$err_file"
+    if test_mise_versions_urls "$err_file" "${urls[@]}"; then
+      rm -f "$err_file"
+      ok "mise versions HTTPS preflight"
+      return 0
+    fi
+    failed_url="$(head -n 1 "$err_file" 2>/dev/null || true)"
+  fi
+
+  warn "mise versions HTTPS preflight failed: $(tail -n 1 "$err_file" 2>/dev/null || true)"
+  rm -f "$err_file"
+  warn "Retry CA refresh manually with: $DOTFILES_ROOT/scripts/update-corporate-ca --config $DOTFILES_CONFIG_DIR/corporate-ca.env --verbose"
+  die "Cannot continue runtime installation until ${failed_url:-mise-versions.jdx.dev} is trusted from this Linux environment."
+}
+
+test_mise_versions_urls() {
+  local err_file="$1" url tmp_err
+  shift
+  : > "$err_file"
+  for url in "$@"; do
+    tmp_err="$(mktemp)"
+    if curl -fsSL --connect-timeout 8 --max-time 20 -o /dev/null "$url" 2>"$tmp_err"; then
+      rm -f "$tmp_err"
+      continue
+    fi
+    {
+      printf "%s\n" "$url"
+      cat "$tmp_err"
+    } > "$err_file"
+    rm -f "$tmp_err"
+    return 1
+  done
+  return 0
 }
 
 read_mise_default_tools() {
@@ -438,7 +501,16 @@ install_corporate_ca() {
     return 0
   fi
   CORPORATE_CA_REFRESH_RAN=1
-  log "Preparing corporate CA refresh"
+  run_corporate_ca_refresh "after dependency setup"
+}
+
+run_corporate_ca_refresh() {
+  local context="${1:-}"
+  if [[ -n "$context" ]]; then
+    log "Preparing corporate CA refresh ($context)"
+  else
+    log "Preparing corporate CA refresh"
+  fi
   copy_template_if_missing "$DOTFILES_ROOT/templates/dotfiles/corporate-ca.env.template" "$DOTFILES_CONFIG_DIR/corporate-ca.env"
   if [[ "${DOTFILES_TEST_MODE:-0}" == "1" ]]; then
     ok "DOTFILES_TEST_MODE: skipped corporate CA refresh"
