@@ -24,6 +24,7 @@
   enabled = true
 
 [alias]
+  # Basic operations
   co = checkout
   st = status
   br = branch
@@ -33,6 +34,55 @@
   unstage = reset HEAD --
   amend = commit --amend
   undo = reset --soft HEAD~1
+  
+  # Log viewing
+  log-oneline = log --oneline
+  log-graph = log --oneline --graph --decorate
+  log-pretty = log --pretty=format:\"%h %ad | %s%d [%an]\" --date=short
+  log-file = log --follow --oneline --
+  
+  # Diff operations
+  diff-staged = diff --cached
+  diff-name-only = diff --name-only
+  
+  # Add/Commit operations
+  add-all = add -A
+  add-p = add -p
+  commit-all = commit -a
+  commit-m = commit -m
+  
+  # Branch/Remote operations
+  branches = branch -a
+  remotes = remote -v
+  tags = tag
+  
+  # Reset/Clean operations
+  uncommit = reset --soft HEAD~
+  discard = reset --hard HEAD
+  clean-discarded = clean -fd
+  
+  # Stash operations
+  stash-list = stash list
+  stash-save = stash save
+  stash-pop = stash pop
+  stash-apply = stash apply
+  stash-drop = stash drop
+  
+  # Fetch/Push/Pull operations
+  fetch-all = fetch --all
+  pull-rebase = pull --rebase
+  push-force = push --force-with-lease
+  
+  # Merge/Rebase operations
+  merge-branch = merge --no-ff
+  rebase-continue = rebase --continue
+  rebase-abort = rebase --abort
+  rebase-skip = rebase --skip
+  
+  # Advanced operations
+  cherry-pick = cherry-pick
+  show-branch = show-branch
+  whatchanged = whatchanged
 
 [includeIf "gitdir:~/work/src/work/"]
   path = ~/.config/git/work.gitconfig
