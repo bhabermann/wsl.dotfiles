@@ -202,10 +202,11 @@ names.
 On WSL, the refresh checks Windows certificate stores such as
 `Cert:\LocalMachine\Root` and `Cert:\CurrentUser\Root`. It installs only CA
 certificates whose subject matches an issuer from the configured host
-certificate chains, or CA certificates that match your local allowlist. This
-handles the common case where a local root CA is trusted by Windows but not yet
-installed in Ubuntu, which can otherwise break tools like `mise` with `unable
-to get local issuer certificate`.
+certificate chains, CA certificates presented by configured host chains, or CA
+certificates that match your local allowlist. This handles the common case
+where a local root CA is trusted by Windows but not yet installed in Ubuntu,
+which can otherwise break tools like `mise` with `unable to get local issuer
+certificate`.
 
 Preview the refresh without changing system trust:
 

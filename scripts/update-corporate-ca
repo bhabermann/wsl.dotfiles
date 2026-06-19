@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROGRAM="update-corporate-ca"
-VERSION="1.1.0"
+VERSION="1.2.0"
 DEFAULT_CONFIG="${HOME:-/tmp}/.config/dotfiles/corporate-ca.env"
 CERT_DIR="/usr/local/share/ca-certificates"
 CERT_PREFIX="corporate-proxy-ca-"
@@ -32,6 +32,7 @@ TEST_URLS=("${DEFAULT_TEST_URLS[@]}")
 WINDOWS_CERT_STORES=("${DEFAULT_WINDOWS_CERT_STORES[@]}")
 ALLOWLIST_REGEX=""
 WINDOWS_TRUSTED_ISSUER_IMPORT="${WINDOWS_TRUSTED_ISSUER_IMPORT:-1}"
+HOST_CHAIN_ISSUER_IMPORT="${HOST_CHAIN_ISSUER_IMPORT:-1}"
 CURL_CONNECT_TIMEOUT="8"
 CURL_MAX_TIME="20"
 
@@ -102,7 +103,7 @@ Options:
 
 Notes:
   - Keep company-specific hosts, URLs, and allowlists in local config only.
-  - Host-captured CA certificates require ALLOWLIST_REGEX before they are installed.
+  - Host-captured CA certificates are installed only when they match ALLOWLIST_REGEX or issue another certificate in a configured host chain.
   - On WSL, CA certificates may also be imported from Windows trust stores when their Subject matches an issuer in configured host chains.
   - Run as a normal user; sudo is used only when updating system trust.
 EOF
@@ -147,6 +148,7 @@ apply_config_defaults() {
   merge_defaults TEST_URLS DEFAULT_TEST_URLS
   merge_defaults WINDOWS_CERT_STORES DEFAULT_WINDOWS_CERT_STORES
   WINDOWS_TRUSTED_ISSUER_IMPORT="${WINDOWS_TRUSTED_ISSUER_IMPORT:-1}"
+  HOST_CHAIN_ISSUER_IMPORT="${HOST_CHAIN_ISSUER_IMPORT:-1}"
 }
 
 merge_defaults() {
@@ -177,6 +179,7 @@ print_config() {
   log "  CURL_CONNECT_TIMEOUT = $CURL_CONNECT_TIMEOUT"
   log "  CURL_MAX_TIME        = $CURL_MAX_TIME"
   log "  WINDOWS_TRUSTED_ISSUER_IMPORT = $WINDOWS_TRUSTED_ISSUER_IMPORT"
+  log "  HOST_CHAIN_ISSUER_IMPORT = $HOST_CHAIN_ISSUER_IMPORT"
   log "  HOSTS                ="
   for host in "${HOSTS[@]}"; do log "    - $host"; done
   log "  TEST_URLS            ="
@@ -190,8 +193,8 @@ validate_config() {
     err "HOSTS is empty in $CONFIG_FILE"
     return 1
   fi
-  if ! allowlist_configured && [[ "$WINDOWS_TRUSTED_ISSUER_IMPORT" != "1" ]]; then
-    warn "ALLOWLIST_REGEX is empty and Windows trusted issuer import is disabled; no CA certificates can be installed automatically."
+  if ! allowlist_configured && [[ "$WINDOWS_TRUSTED_ISSUER_IMPORT" != "1" && "$HOST_CHAIN_ISSUER_IMPORT" != "1" ]]; then
+    warn "ALLOWLIST_REGEX is empty and automatic issuer imports are disabled; no CA certificates can be installed automatically."
   fi
 }
 
@@ -204,8 +207,8 @@ ensure_tmp_permissions() {
 
 is_valid_x509() { openssl x509 -in "$1" -noout >/dev/null 2>&1; }
 is_ca_true() { openssl x509 -in "$1" -noout -text 2>/dev/null | grep -q "CA:TRUE"; }
-subject_line() { openssl x509 -in "$1" -noout -subject 2>/dev/null | sed 's/^subject= *//'; }
-issuer_line() { openssl x509 -in "$1" -noout -issuer 2>/dev/null | sed 's/^issuer= *//'; }
+subject_line() { openssl x509 -in "$1" -noout -subject -nameopt RFC2253 2>/dev/null | sed 's/^subject= *//'; }
+issuer_line() { openssl x509 -in "$1" -noout -issuer -nameopt RFC2253 2>/dev/null | sed 's/^issuer= *//'; }
 enddate_line() { openssl x509 -in "$1" -noout -enddate 2>/dev/null | sed 's/^notAfter=//'; }
 
 sha256_fp() {
@@ -312,8 +315,7 @@ fetch_chain_pem() {
 
 collect_needed_issuer_subjects() {
   reset_needed_issuer_subjects
-  [[ "$WINDOWS_TRUSTED_ISSUER_IMPORT" == "1" ]] || return 0
-  is_wsl || return 0
+  [[ "$WINDOWS_TRUSTED_ISSUER_IMPORT" == "1" || "$HOST_CHAIN_ISSUER_IMPORT" == "1" ]] || return 0
 
   debug "Collecting issuer subjects from configured host certificate chains."
   local host pem
@@ -349,7 +351,12 @@ fetch_and_install_from_hosts() {
       grep -q "BEGIN CERTIFICATE" "$chunk" || continue
       is_valid_x509 "$chunk" || { debug "Skipping invalid x509 chunk from $host"; continue; }
       is_ca_true "$chunk" || { debug "Skipping non-CA certificate from $host: $(subject_line "$chunk")"; continue; }
-      matches_allowlist "$chunk" || { debug "Skipping host-captured CA without allowlist match: $(subject_line "$chunk")"; continue; }
+      local subject
+      subject="$(subject_line "$chunk")"
+      if ! matches_allowlist "$chunk" && ! { [[ "$HOST_CHAIN_ISSUER_IMPORT" == "1" ]] && subject_is_needed_issuer "$subject"; }; then
+        debug "Skipping host-captured CA without allowlist or issuer match: $subject"
+        continue
+      fi
       install_cert_pem "$chunk" && installed=$((installed + 1))
     done
   done
