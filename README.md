@@ -66,11 +66,14 @@ Every real install first bootstraps the Ubuntu packages that later setup steps
 assume are present:
 
 ```text
-build-essential curl wget git openssh-client ca-certificates gnupg jq unzip zip less locales software-properties-common xdg-utils libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata
+build-essential curl wget git openssh-client ca-certificates openssl gnupg jq unzip zip less locales software-properties-common xdg-utils libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata
 ```
 
 Dependency setup appears in the installation plan, but it is not a selectable
 or persisted tool group.
+
+Immediately after those Ubuntu packages are present, setup runs the CA refresh
+before installing runtimes, Docker, or other network-heavy tools.
 
 The runtime libraries include the native ICU, SSL, Kerberos, timezone, and
 compression dependencies required by mise-managed .NET. The installer also
@@ -116,9 +119,10 @@ Recommended groups:
 Optional groups:
 
 - `history`: Atuin.
-- `corporate-ca`: work-profile CA refresh for corporate TLS interception CAs.
+- `corporate-ca`: explicit rerun of the CA refresh for TLS interception CAs.
 
-Work profile installs include `corporate-ca` automatically on the first run.
+The CA refresh also runs automatically after dependency setup on every real
+install.
 
 ## Package Policy
 
@@ -177,11 +181,11 @@ The installer creates local files only when missing.
 
 ## When Corporate CA Is Needed
 
-Some corporate networks intercept TLS and present a company-controlled CA. The
-work profile now includes this refresh on the first install. If tools such as
-`curl`, `git`, `mise`, `npm`, package installers, or Docker setup still fail
-with certificate verification errors on the work network, set up
-`~/.config/dotfiles/corporate-ca.env` and rerun the refresh:
+Some networks intercept TLS and present a locally trusted CA. Setup runs the CA
+refresh immediately after Ubuntu base packages are installed, before `mise`,
+Docker, or other network-heavy setup. If tools such as `curl`, `git`, `mise`,
+`npm`, package installers, or Docker setup still fail with certificate
+verification errors, review `~/.config/dotfiles/corporate-ca.env` and rerun:
 
 ```bash
 ./scripts/update-corporate-ca --config ~/.config/dotfiles/corporate-ca.env
@@ -189,15 +193,19 @@ with certificate verification errors on the work network, set up
 
 The installer copies
 `templates/dotfiles/corporate-ca.env.template` to
-`~/.config/dotfiles/corporate-ca.env` when missing. Put local hostnames, test
-URLs, and the subject/issuer allowlist regex there. The repository intentionally
-does not include company-specific hosts or certificate authority names.
+`~/.config/dotfiles/corporate-ca.env` when missing. The default config targets
+the public download hosts used by this installer. Put any machine-local
+hostnames, test URLs, or subject/issuer allowlist regex there. The repository
+intentionally does not include company-specific hosts or certificate authority
+names.
 
-On WSL, the refresh also checks allowlisted Windows certificate stores such as
-`Cert:\LocalMachine\Root` and `Cert:\CurrentUser\Root`. This handles the common
-case where the corporate root CA is trusted by Windows but not yet installed in
-Ubuntu, which can otherwise break tools like `mise` with `unable to get local
-issuer certificate`.
+On WSL, the refresh checks Windows certificate stores such as
+`Cert:\LocalMachine\Root` and `Cert:\CurrentUser\Root`. It installs only CA
+certificates whose subject matches an issuer from the configured host
+certificate chains, or CA certificates that match your local allowlist. This
+handles the common case where a local root CA is trusted by Windows but not yet
+installed in Ubuntu, which can otherwise break tools like `mise` with `unable
+to get local issuer certificate`.
 
 Preview the refresh without changing system trust:
 

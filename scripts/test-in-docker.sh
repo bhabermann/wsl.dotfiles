@@ -19,6 +19,7 @@ grep -q "add-apt-repository -y ppa:jdxcode/mise" install/install.sh
 grep -q "apt-get install -y mise" install/install.sh
 grep -q "INSTALL_ORDER=(corporate-ca runtime shell history modern-cli docker-desktop docker-wsl-engine)" lib/tools.sh
 grep -q "libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata" install/install.sh
+grep -q "ca-certificates openssl gnupg" install/install.sh
 grep -q "bash-completion util-linux-extra" install/install.sh
 grep -q "newgrp docker" scripts/test-docker.sh
 ! grep -q "sg docker" scripts/test-docker.sh
@@ -148,7 +149,7 @@ bash -lc 'source /workspace/lib/common.sh; source /workspace/lib/tools.sh; PROFI
 ! grep -qx "corporate-ca" "$actual"
 
 bash -lc 'source /workspace/lib/common.sh; source /workspace/lib/tools.sh; PROFILE=work NON_INTERACTIVE=1 TOOLS_PRESET=recommended DOCKER_STRATEGY=none resolve_tool_selection --' > "$actual"
-! grep -qx "corporate-ca" "$actual"
+grep -qx "corporate-ca" "$actual"
 
 bash -lc 'source /workspace/lib/common.sh; source /workspace/lib/tools.sh; PROFILE=work NON_INTERACTIVE=1 TOOLS_PRESET=recommended DOCKER_STRATEGY=none resolve_tool_selection corporate-ca --' > "$actual"
 grep -qx "corporate-ca" "$actual"
@@ -165,15 +166,14 @@ grep -q "update-corporate-ca" /tmp/update-corporate-ca-help.txt
 ca_config="$(mktemp)"
 cat > "$ca_config" <<'EOF'
 HOSTS=("127.0.0.1")
-ALLOWLIST_REGEX="Example"
 TEST_URLS=()
 EOF
 ./scripts/update-corporate-ca --config "$ca_config" --print-config >/tmp/update-corporate-ca-config.txt
 grep -q "127.0.0.1" /tmp/update-corporate-ca-config.txt
 ./scripts/update-corporate-ca --config "$ca_config" --dry-run >/tmp/update-corporate-ca-dry-run.txt 2>&1
 grep -q "Dry-run completed" /tmp/update-corporate-ca-dry-run.txt
-HOME=/tmp/dotfiles-missing-ca-home ./scripts/update-corporate-ca --dry-run >/tmp/update-corporate-ca-missing.txt 2>&1 && exit 1
-grep -q "Config file not found" /tmp/update-corporate-ca-missing.txt
+HOME=/tmp/dotfiles-missing-ca-home ./scripts/update-corporate-ca --print-config >/tmp/update-corporate-ca-missing.txt 2>&1
+grep -q "mise-versions.jdx.dev" /tmp/update-corporate-ca-missing.txt
 
 echo "==> non-interactive test-mode install"
 export HOME=/tmp/dotfiles-home
@@ -202,11 +202,16 @@ grep -q "^Complete$" /tmp/setup-install-first.txt
 ! grep -q "Dotfiles doctor" /tmp/setup-install-first.txt
 grep -q "Git identity:.*will create" /tmp/setup-install-first.txt
 grep -q "Dependency setup:.*Ubuntu base packages (always installed first)" /tmp/setup-install-first.txt
+grep -q "CA refresh:.*Linux trust refresh" /tmp/setup-install-first.txt
 grep -q "Installing dependency setup: Ubuntu base packages" /tmp/setup-install-first.txt
 grep -q "DOTFILES_TEST_MODE: skipped dependency package installation" /tmp/setup-install-first.txt
+grep -q "Preparing corporate CA refresh" /tmp/setup-install-first.txt
 dependency_line="$(grep -n "Installing dependency setup: Ubuntu base packages" /tmp/setup-install-first.txt | cut -d: -f1 | head -n1)"
+ca_line="$(grep -n "Preparing corporate CA refresh" /tmp/setup-install-first.txt | cut -d: -f1 | head -n1)"
 shell_line="$(grep -n "Installing shell tools" /tmp/setup-install-first.txt | cut -d: -f1 | head -n1)"
 test "$dependency_line" -lt "$shell_line"
+test "$dependency_line" -lt "$ca_line"
+test "$ca_line" -lt "$shell_line"
 grep -q "Default shell:.*zsh" /tmp/setup-install-first.txt
 grep -q "DOTFILES_TEST_MODE: skipped login shell change" /tmp/setup-install-first.txt
 
@@ -231,6 +236,7 @@ test -L "$HOME/.local/bin/wslview"
 test -f "$HOME/.config/git/identity.gitconfig"
 test -f "$HOME/.ssh/config"
 test -f "$HOME/.config/dotfiles/selected-tools"
+test -f "$HOME/.config/dotfiles/corporate-ca.env"
 test "$(cat "$HOME/.config/dotfiles/default-shell")" = "zsh"
 ! grep -qx "base" "$HOME/.config/dotfiles/selected-tools"
 ! grep -qx "corporate-ca" "$HOME/.config/dotfiles/selected-tools"

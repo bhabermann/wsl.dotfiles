@@ -2,21 +2,36 @@
 set -euo pipefail
 
 PROGRAM="update-corporate-ca"
-VERSION="1.0.0"
+VERSION="1.1.0"
 DEFAULT_CONFIG="${HOME:-/tmp}/.config/dotfiles/corporate-ca.env"
 CERT_DIR="/usr/local/share/ca-certificates"
 CERT_PREFIX="corporate-proxy-ca-"
 WORKDIR="$(mktemp -d /tmp/update-corporate-ca.XXXXXX)"
+NEEDED_ISSUER_SUBJECTS_FILE="$WORKDIR/needed-issuer-subjects.txt"
 
-HOSTS=()
-TEST_URLS=()
-WINDOWS_CERT_STORES=(
+DEFAULT_HOSTS=(
+  "mise-versions.jdx.dev"
+  "github.com"
+  "download.docker.com"
+  "ppa.launchpadcontent.net"
+)
+DEFAULT_TEST_URLS=(
+  "https://mise-versions.jdx.dev/data/go.toml"
+  "https://github.com"
+  "https://download.docker.com/linux/ubuntu/gpg"
+)
+DEFAULT_WINDOWS_CERT_STORES=(
   "Cert:\\LocalMachine\\Root"
   "Cert:\\LocalMachine\\CA"
   "Cert:\\CurrentUser\\Root"
   "Cert:\\CurrentUser\\CA"
 )
+
+HOSTS=("${DEFAULT_HOSTS[@]}")
+TEST_URLS=("${DEFAULT_TEST_URLS[@]}")
+WINDOWS_CERT_STORES=("${DEFAULT_WINDOWS_CERT_STORES[@]}")
 ALLOWLIST_REGEX=""
+WINDOWS_TRUSTED_ISSUER_IMPORT="${WINDOWS_TRUSTED_ISSUER_IMPORT:-1}"
 CURL_CONNECT_TIMEOUT="8"
 CURL_MAX_TIME="20"
 
@@ -24,6 +39,7 @@ DRY_RUN=0
 VERBOSE=0
 DO_CLEANUP=0
 CONFIG_FILE="$DEFAULT_CONFIG"
+CONFIG_FILE_PROVIDED=0
 PRINT_CONFIG=0
 LOG_ENABLED=1
 DEFAULT_LOG_FILE="${HOME:-/tmp}/.cache/update-corporate-ca.log"
@@ -69,7 +85,7 @@ $PROGRAM $VERSION
 
 Purpose:
   Capture corporate TLS interception CA certificates from configured hosts,
-  install only allowlisted CA certificates into Linux trust, and run HTTPS tests.
+  install trusted matching CA certificates into Linux trust, and run HTTPS tests.
 
 Usage:
   $PROGRAM [options]
@@ -86,8 +102,8 @@ Options:
 
 Notes:
   - Keep company-specific hosts, URLs, and allowlists in local config only.
-  - Only certificates with CA:TRUE and Subject or Issuer matching ALLOWLIST_REGEX are installed.
-  - On WSL, matching CA certificates are also imported from Windows trust stores when powershell.exe is available.
+  - Host-captured CA certificates require ALLOWLIST_REGEX before they are installed.
+  - On WSL, CA certificates may also be imported from Windows trust stores when their Subject matches an issuer in configured host chains.
   - Run as a normal user; sudo is used only when updating system trust.
 EOF
 }
@@ -96,7 +112,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --cleanup) DO_CLEANUP=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
-    --config) CONFIG_FILE="${2:-}"; shift 2 ;;
+    --config) CONFIG_FILE="${2:-}"; CONFIG_FILE_PROVIDED=1; shift 2 ;;
     --print-config) PRINT_CONFIG=1; shift ;;
     --verbose) VERBOSE=1; shift ;;
     --no-log) LOG_ENABLED=0; shift ;;
@@ -112,13 +128,34 @@ need_cmd() {
 
 load_config() {
   if [[ ! -f "$CONFIG_FILE" ]]; then
-    err "Config file not found: $CONFIG_FILE"
-    err "Create it from templates/dotfiles/corporate-ca.env.template or rerun ./setup install --profile work --with corporate-ca."
-    exit 1
+    if [[ "$CONFIG_FILE_PROVIDED" -eq 1 ]]; then
+      err "Config file not found: $CONFIG_FILE"
+      exit 1
+    fi
+    warn "Config file not found: $CONFIG_FILE; using built-in defaults."
+    apply_config_defaults
+    return 0
   fi
   debug "Loading config: $CONFIG_FILE"
   # shellcheck disable=SC1090
   source "$CONFIG_FILE"
+  apply_config_defaults
+}
+
+apply_config_defaults() {
+  if [[ "${#HOSTS[@]}" -eq 0 ]]; then
+    HOSTS=("${DEFAULT_HOSTS[@]}")
+    debug "HOSTS is empty; using built-in defaults."
+  fi
+  if [[ "${#TEST_URLS[@]}" -eq 0 ]]; then
+    TEST_URLS=("${DEFAULT_TEST_URLS[@]}")
+    debug "TEST_URLS is empty; using built-in defaults."
+  fi
+  if [[ "${#WINDOWS_CERT_STORES[@]}" -eq 0 ]]; then
+    WINDOWS_CERT_STORES=("${DEFAULT_WINDOWS_CERT_STORES[@]}")
+    debug "WINDOWS_CERT_STORES is empty; using built-in defaults."
+  fi
+  WINDOWS_TRUSTED_ISSUER_IMPORT="${WINDOWS_TRUSTED_ISSUER_IMPORT:-1}"
 }
 
 print_config() {
@@ -130,6 +167,7 @@ print_config() {
   log "  LOG_FILE             = $LOG_FILE"
   log "  CURL_CONNECT_TIMEOUT = $CURL_CONNECT_TIMEOUT"
   log "  CURL_MAX_TIME        = $CURL_MAX_TIME"
+  log "  WINDOWS_TRUSTED_ISSUER_IMPORT = $WINDOWS_TRUSTED_ISSUER_IMPORT"
   log "  HOSTS                ="
   for host in "${HOSTS[@]}"; do log "    - $host"; done
   log "  TEST_URLS            ="
@@ -143,9 +181,8 @@ validate_config() {
     err "HOSTS is empty in $CONFIG_FILE"
     return 1
   fi
-  if [[ -z "$ALLOWLIST_REGEX" ]]; then
-    err "ALLOWLIST_REGEX is empty in $CONFIG_FILE"
-    return 1
+  if ! allowlist_configured && [[ "$WINDOWS_TRUSTED_ISSUER_IMPORT" != "1" ]]; then
+    warn "ALLOWLIST_REGEX is empty and Windows trusted issuer import is disabled; no CA certificates can be installed automatically."
   fi
 }
 
@@ -167,11 +204,32 @@ sha256_fp() {
     | sed -E 's/^SHA256 Fingerprint=//; s/://g; s/[[:space:]]//g'
 }
 
+allowlist_configured() {
+  [[ -n "${ALLOWLIST_REGEX//[[:space:]]/}" ]]
+}
+
 matches_allowlist() {
   local subj iss
+  allowlist_configured || return 1
   subj="$(subject_line "$1")"
   iss="$(issuer_line "$1")"
   printf "%s %s\n" "$subj" "$iss" | grep -Eiq "$ALLOWLIST_REGEX"
+}
+
+reset_needed_issuer_subjects() {
+  : > "$NEEDED_ISSUER_SUBJECTS_FILE"
+}
+
+add_needed_issuer_subject() {
+  local subject="$1"
+  [[ -n "$subject" ]] || return 0
+  grep -Fqx "$subject" "$NEEDED_ISSUER_SUBJECTS_FILE" 2>/dev/null || printf "%s\n" "$subject" >> "$NEEDED_ISSUER_SUBJECTS_FILE"
+}
+
+subject_is_needed_issuer() {
+  local subject="$1"
+  [[ -n "$subject" && -f "$NEEDED_ISSUER_SUBJECTS_FILE" ]] || return 1
+  grep -Fqx "$subject" "$NEEDED_ISSUER_SUBJECTS_FILE"
 }
 
 install_cert_pem() {
@@ -243,6 +301,29 @@ fetch_chain_pem() {
   grep -q "BEGIN CERTIFICATE" "$out"
 }
 
+collect_needed_issuer_subjects() {
+  reset_needed_issuer_subjects
+  [[ "$WINDOWS_TRUSTED_ISSUER_IMPORT" == "1" ]] || return 0
+  is_wsl || return 0
+
+  debug "Collecting issuer subjects from configured host certificate chains."
+  local host pem
+  for host in "${HOSTS[@]}"; do
+    pem="$WORKDIR/$host-issuers.pem"
+    if ! fetch_chain_pem "$host" "$pem"; then
+      debug "No issuer subjects collected from $host."
+      continue
+    fi
+
+    csplit -f "$WORKDIR/$host-issuer-cert-" "$pem" '/-----BEGIN CERTIFICATE-----/' '{*}' >/dev/null 2>&1 || true
+    for chunk in "$WORKDIR"/"$host"-issuer-cert-*; do
+      grep -q "BEGIN CERTIFICATE" "$chunk" || continue
+      is_valid_x509 "$chunk" || continue
+      add_needed_issuer_subject "$(issuer_line "$chunk")"
+    done
+  done
+}
+
 fetch_and_install_from_hosts() {
   log "Fetching certificate chains from configured hosts."
   local installed=0
@@ -259,7 +340,7 @@ fetch_and_install_from_hosts() {
       grep -q "BEGIN CERTIFICATE" "$chunk" || continue
       is_valid_x509 "$chunk" || { debug "Skipping invalid x509 chunk from $host"; continue; }
       is_ca_true "$chunk" || { debug "Skipping non-CA certificate from $host: $(subject_line "$chunk")"; continue; }
-      matches_allowlist "$chunk" || { debug "Skipping CA not matching allowlist: $(subject_line "$chunk")"; continue; }
+      matches_allowlist "$chunk" || { debug "Skipping host-captured CA without allowlist match: $(subject_line "$chunk")"; continue; }
       install_cert_pem "$chunk" && installed=$((installed + 1))
     done
   done
@@ -274,11 +355,12 @@ fetch_and_install_from_hosts() {
 }
 
 fetch_and_install_from_windows_store() {
+  [[ "$WINDOWS_TRUSTED_ISSUER_IMPORT" == "1" ]] || return 0
   is_wsl || return 0
   command -v powershell.exe >/dev/null 2>&1 || { debug "powershell.exe unavailable; skipped Windows certificate store import."; return 0; }
   command -v wslpath >/dev/null 2>&1 || { debug "wslpath unavailable; skipped Windows certificate store import."; return 0; }
 
-  log "Checking Windows certificate stores for allowlisted CA certificates."
+  log "Checking Windows certificate stores for trusted issuers."
   local export_dir="$WORKDIR/windows-certs"
   mkdir -p "$export_dir"
 
@@ -293,7 +375,6 @@ fetch_and_install_from_windows_store() {
   cat > "$ps_script" <<'PWSH'
 param(
   [Parameter(Mandatory = $true)][string]$OutDir,
-  [Parameter(Mandatory = $true)][string]$AllowlistRegex,
   [Parameter(ValueFromRemainingArguments = $true)][string[]]$Stores
 )
 
@@ -305,9 +386,6 @@ foreach ($store in $Stores) {
     continue
   }
   Get-ChildItem -LiteralPath $store |
-    Where-Object {
-      $_.Subject -match $AllowlistRegex -or $_.Issuer -match $AllowlistRegex
-    } |
     ForEach-Object {
       $basicConstraints = $_.Extensions |
         Where-Object { $_.Oid.Value -eq "2.5.29.19" } |
@@ -321,12 +399,12 @@ foreach ($store in $Stores) {
 }
 PWSH
 
-  if ! powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$ps_script")" "$(wslpath -w "$export_dir")" "$ALLOWLIST_REGEX" "${store_args[@]}" >/dev/null; then
-    warn "Could not export allowlisted CA certificates from Windows certificate stores."
+  if ! powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$ps_script")" "$(wslpath -w "$export_dir")" "${store_args[@]}" >/dev/null; then
+    warn "Could not export CA certificates from Windows certificate stores."
     return 0
   fi
 
-  local installed=0 cert pem
+  local installed=0 cert pem subj
   for cert in "$export_dir"/*.cer; do
     [[ -f "$cert" ]] || continue
     pem="$cert.pem"
@@ -336,7 +414,11 @@ PWSH
     fi
     is_valid_x509 "$pem" || continue
     is_ca_true "$pem" || { debug "Skipping non-CA Windows certificate: $(subject_line "$pem")"; continue; }
-    matches_allowlist "$pem" || { debug "Skipping Windows CA not matching allowlist: $(subject_line "$pem")"; continue; }
+    subj="$(subject_line "$pem")"
+    if ! matches_allowlist "$pem" && ! subject_is_needed_issuer "$subj"; then
+      debug "Skipping Windows CA that is not a configured host issuer: $subj"
+      continue
+    fi
     install_cert_pem "$pem" && installed=$((installed + 1))
   done
 
@@ -394,6 +476,7 @@ main() {
     exit 0
   fi
 
+  collect_needed_issuer_subjects
   fetch_and_install_from_windows_store
   fetch_and_install_from_hosts
 

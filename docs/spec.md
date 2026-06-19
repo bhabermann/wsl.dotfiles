@@ -28,13 +28,19 @@
 | modern-cli | recommended | apt-installed ripgrep, fd, bat, eza, jq, yq, gh, tree, and tmux |
 | runtime | recommended | mise-managed global Node, .NET, Python, Go, uv, and Java |
 | history | optional | Atuin searchable shell history |
-| corporate-ca | explicit work opt-in | Capture configured corporate TLS interception CA chains and install only allowlisted CA certificates |
+| corporate-ca | explicit rerun | Refresh TLS interception CA certificates when requested |
 
 Dependency setup always runs first during real installs and installs Ubuntu
 essentials for compiling, downloads, certificates, archives, locale, JSON,
 Windows-browser launching, and mise-managed .NET native dependencies. Dry-runs show this step in the plan without installing packages or
 writing state. Legacy saved `selected-tools` entries and `--with/--without
 base` flags are accepted as no-ops and are not persisted.
+
+CA refresh runs immediately after dependency setup during every real install,
+before runtime, Docker, or other network-heavy setup. On WSL it can import
+Windows-trusted CA certificates whose subjects match issuers from configured
+download host certificate chains. Host-captured CA certificates still require a
+local allowlist before installation.
 
 Ubuntu apt owns WSL system tools and general CLIs, including Starship, Atuin,
 zsh autosuggestions, and syntax highlighting. mise is installed from its
@@ -51,10 +57,9 @@ Docker is not a tool group prompt. It is one mutually exclusive strategy:
 - `desktop`: optional Docker Desktop WSL integration check.
 - `none`: skip Docker setup.
 
-Corporate CA support is selected automatically for work-profile installs.
-Interactive installs still show it as a work-profile follow-up. Personal
-installs must pass `--with corporate-ca` when a local TLS interception CA is
-needed.
+Corporate CA support is available as an explicit rerun group, but the main
+setup path refreshes CA trust immediately after base packages regardless of
+profile.
 
 `./setup verify` remains a diagnostic command. Reconfigure defaults come from
 persisted setup state, not live command detection.

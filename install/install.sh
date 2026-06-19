@@ -60,6 +60,7 @@ action_install() {
   field "Default shell" "$default_shell_choice (${DEFAULT_SHELL_SOURCE:-unknown})"
   field "Git identity" "$identity_status"
   field "Dependency setup" "Ubuntu base packages (always installed first)"
+  field "CA refresh" "Linux trust refresh (always run after dependency setup)"
   info "Tools:"
   for group in "${selected_groups[@]}"; do
     item "$(tool_label "$group"): $(tool_description "$group")"
@@ -85,6 +86,7 @@ action_install() {
 
   section "Installation"
   install_dependency_setup
+  install_corporate_ca
   for group in "${selected_groups[@]}"; do
     case "$group" in
       shell) install_shell ;;
@@ -274,7 +276,7 @@ install_dependency_setup() {
   fi
   require_sudo
   sudo apt-get update -y
-  sudo apt-get install -y build-essential curl wget git openssh-client ca-certificates gnupg jq unzip zip less locales software-properties-common xdg-utils bash-completion util-linux-extra libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata
+  sudo apt-get install -y build-essential curl wget git openssh-client ca-certificates openssl gnupg jq unzip zip less locales software-properties-common xdg-utils bash-completion util-linux-extra libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata
   sudo locale-gen en_US.UTF-8 >/dev/null || true
   sudo update-locale LANG=en_US.UTF-8 >/dev/null || true
 }
@@ -431,6 +433,11 @@ install_history() {
 }
 
 install_corporate_ca() {
+  if [[ "${CORPORATE_CA_REFRESH_RAN:-0}" == "1" ]]; then
+    ok "Corporate CA refresh already handled after dependency setup"
+    return 0
+  fi
+  CORPORATE_CA_REFRESH_RAN=1
   log "Preparing corporate CA refresh"
   copy_template_if_missing "$DOTFILES_ROOT/templates/dotfiles/corporate-ca.env.template" "$DOTFILES_CONFIG_DIR/corporate-ca.env"
   if [[ "${DOTFILES_TEST_MODE:-0}" == "1" ]]; then
@@ -438,7 +445,6 @@ install_corporate_ca() {
     return 0
   fi
   require_sudo
-  sudo apt-get update -y
   sudo apt-get install -y openssl ca-certificates curl
   if "$DOTFILES_ROOT/scripts/update-corporate-ca" --config "$DOTFILES_CONFIG_DIR/corporate-ca.env"; then
     ok "Corporate CA refresh completed"
