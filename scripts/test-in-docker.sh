@@ -24,6 +24,10 @@ grep -q "ensure_mise_versions_https" install/install.sh
 grep -q "configure_runtime_ca_bundle" install/install.sh
 grep -q "python-precompiled_x86_64" install/install.sh || grep -q "python-precompiled-x86_64" install/install.sh
 grep -q "SSL_CERT_FILE" install/install.sh
+grep -q "BEGIN DOTFILES MANAGED" templates/dotfiles/corporate-ca.env.template
+grep -q "END DOTFILES MANAGED" templates/dotfiles/corporate-ca.env.template
+grep -q "copy_or_update_template_with_markers" lib/common.sh
+grep -q "validate_managed_markers" lib/common.sh
 grep -q "bash-completion util-linux-extra" install/install.sh
 grep -q "newgrp docker" scripts/test-docker.sh
 ! grep -q "sg docker" scripts/test-docker.sh
@@ -180,6 +184,32 @@ grep -q "HOST_CHAIN_ISSUER_IMPORT" /tmp/update-corporate-ca-config.txt
 grep -q "Dry-run completed" /tmp/update-corporate-ca-dry-run.txt
 HOME=/tmp/dotfiles-missing-ca-home ./scripts/update-corporate-ca --print-config >/tmp/update-corporate-ca-missing.txt 2>&1
 grep -q "mise-versions.jdx.dev" /tmp/update-corporate-ca-missing.txt
+
+echo "==> corporate CA marker management"
+test_config="$(mktemp)"
+test_src="$(mktemp)"
+cat > "$test_src" <<'EOF'
+# Test template
+# BEGIN DOTFILES MANAGED
+MANAGED_VALUE="test"
+# END DOTFILES MANAGED
+EOF
+# Test creation from template
+bash -lc 'source /workspace/lib/common.sh; copy_or_update_template_with_markers "$1" "$2"' _ "$test_src" "$test_config"
+grep -q "BEGIN DOTFILES MANAGED" "$test_config"
+grep -q "END DOTFILES MANAGED" "$test_config"
+grep -q "MANAGED_VALUE" "$test_config"
+# Test validation
+bash -lc 'source /workspace/lib/common.sh; validate_managed_markers "$1"' _ "$test_config"
+# Test corruption detection and repair
+sed -i 's/END DOTFILES MANAGED/END DOTFILES MANAGED CORRUPTED/' "$test_config"
+! bash -lc 'source /workspace/lib/common.sh; validate_managed_markers "$1"' _ "$test_config"
+bash -lc 'source /workspace/lib/common.sh; copy_or_update_template_with_markers "$1" "$2"' _ "$test_src" "$test_config"
+grep -q "BEGIN DOTFILES MANAGED" "$test_config"
+grep -q "END DOTFILES MANAGED" "$test_config"
+! grep -q "CORRUPTED" "$test_config"
+bash -lc 'source /workspace/lib/common.sh; validate_managed_markers "$1"' _ "$test_config"
+rm -f "$test_config" "$test_src"
 
 echo "==> non-interactive test-mode install"
 export HOME=/tmp/dotfiles-home

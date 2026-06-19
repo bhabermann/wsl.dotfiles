@@ -511,7 +511,13 @@ run_corporate_ca_refresh() {
   else
     log "Preparing corporate CA refresh"
   fi
-  copy_template_if_missing "$DOTFILES_ROOT/templates/dotfiles/corporate-ca.env.template" "$DOTFILES_CONFIG_DIR/corporate-ca.env"
+  copy_or_update_template_with_markers "$DOTFILES_ROOT/templates/dotfiles/corporate-ca.env.template" "$DOTFILES_CONFIG_DIR/corporate-ca.env"
+  
+  if ! validate_managed_markers "$DOTFILES_CONFIG_DIR/corporate-ca.env"; then
+    warn "Corporate CA config has invalid managed markers; repairing"
+    copy_or_update_template_with_markers "$DOTFILES_ROOT/templates/dotfiles/corporate-ca.env.template" "$DOTFILES_CONFIG_DIR/corporate-ca.env"
+  fi
+  
   if [[ "${DOTFILES_TEST_MODE:-0}" == "1" ]]; then
     ok "DOTFILES_TEST_MODE: skipped corporate CA refresh"
     return 0

@@ -239,6 +239,93 @@ managed_source_block_valid() {
   ' "$rc_file"
 }
 
+copy_or_update_template_with_markers() {
+  local src="$1"
+  local dest="$2"
+  local begin_marker="# BEGIN DOTFILES MANAGED"
+  local end_marker="# END DOTFILES MANAGED"
+  local tmp before managed after
+
+  mkdir -p "$(dirname "$dest")"
+
+  if [[ ! -e "$dest" ]]; then
+    cp "$src" "$dest"
+    ok "Created $dest from template"
+    return 0
+  fi
+
+  if ! grep -qF "$begin_marker" "$dest" || ! grep -qF "$end_marker" "$dest"; then
+    warn "$dest exists but lacks managed markers; backing up and recreating"
+    backup_path "$dest"
+    cp "$src" "$dest"
+    ok "Recreated $dest from template"
+    return 0
+  fi
+
+  tmp="$(mktemp)"
+  before="$(mktemp)"
+  managed="$(mktemp)"
+  after="$(mktemp)"
+
+  # Extract content before BEGIN marker from dest
+  awk -v begin="$begin_marker" '
+    BEGIN { found = 0 }
+    $0 == begin { found = 1; exit }
+    { print }
+  ' "$dest" > "$before"
+
+  # Extract managed section from source
+  awk -v begin="$begin_marker" -v end="$end_marker" '
+    BEGIN { in_managed = 0 }
+    $0 == begin { in_managed = 1; print; next }
+    $0 == end { in_managed = 0; print; next }
+    in_managed { print }
+  ' "$src" > "$managed"
+
+  # Extract content after END marker (or corrupted variant) from dest
+  awk -v end="$end_marker" '
+    BEGIN { in_managed = 1; found_end = 0 }
+    $0 == end || $0 ~ end { in_managed = 0; found_end = 1; next }
+    !in_managed && found_end { print }
+  ' "$dest" > "$after"
+
+  # Combine the parts
+  cat "$before" > "$tmp"
+  cat "$managed" >> "$tmp"
+  cat "$after" >> "$tmp"
+
+  rm -f "$before" "$managed" "$after"
+  mv "$tmp" "$dest"
+  ok "Updated managed section in $dest"
+}
+
+validate_managed_markers() {
+  local file="$1"
+  local begin_marker="# BEGIN DOTFILES MANAGED"
+  local end_marker="# END DOTFILES MANAGED"
+
+  [[ -f "$file" ]] || return 1
+  [[ "$(grep -Fxc "$begin_marker" "$file" || true)" == "1" ]] || return 1
+  [[ "$(grep -Fxc "$end_marker" "$file" || true)" == "1" ]] || return 1
+
+  awk -v begin="$begin_marker" -v end="$end_marker" '
+    BEGIN { in_managed = 0; begin_seen = 0; end_seen = 0 }
+    $0 == begin { 
+      if (in_managed) exit 1
+      in_managed = 1
+      begin_seen = 1
+      next 
+    }
+    $0 == end { 
+      if (!in_managed) exit 1
+      in_managed = 0
+      end_seen = 1
+      next 
+    }
+    END { exit((begin_seen && end_seen && !in_managed) ? 0 : 1) }
+  ' "$file"
+}
+
 require_sudo() {
   if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
     return 0
