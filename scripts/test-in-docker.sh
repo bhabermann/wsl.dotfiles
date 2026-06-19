@@ -20,6 +20,10 @@ grep -q "apt-get install -y mise" install/install.sh
 grep -q "INSTALL_ORDER=(corporate-ca runtime shell history modern-cli docker-desktop docker-wsl-engine)" lib/tools.sh
 grep -q "libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata" install/install.sh
 grep -q "ca-certificates openssl gnupg" install/install.sh
+grep -q "ensure_mise_versions_https" install/install.sh
+grep -q "configure_runtime_ca_bundle" install/install.sh
+grep -q "python-precompiled_x86_64" install/install.sh || grep -q "python-precompiled-x86_64" install/install.sh
+grep -q "SSL_CERT_FILE" install/install.sh
 grep -q "bash-completion util-linux-extra" install/install.sh
 grep -q "newgrp docker" scripts/test-docker.sh
 ! grep -q "sg docker" scripts/test-docker.sh

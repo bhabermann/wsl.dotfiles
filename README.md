@@ -183,9 +183,11 @@ The installer creates local files only when missing.
 
 Some networks intercept TLS and present a locally trusted CA. Setup runs the CA
 refresh immediately after Ubuntu base packages are installed, before `mise`,
-Docker, or other network-heavy setup. If tools such as `curl`, `git`, `mise`,
-`npm`, package installers, or Docker setup still fail with certificate
-verification errors, review `~/.config/dotfiles/corporate-ca.env` and rerun:
+Docker, or other network-heavy setup. Runtime installation also verifies the
+`mise-versions.jdx.dev` HTTPS path before `mise install` and retries CA refresh
+once if TLS verification fails. If tools such as `curl`, `git`, `mise`, `npm`,
+package installers, or Docker setup still fail with certificate verification
+errors, review `~/.config/dotfiles/corporate-ca.env` and rerun:
 
 ```bash
 ./scripts/update-corporate-ca --config ~/.config/dotfiles/corporate-ca.env
