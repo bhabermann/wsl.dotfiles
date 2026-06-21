@@ -77,9 +77,18 @@ if (-not $ttfFiles) {
 }
 
 $installed = 0
+$locked = 0
 foreach ($ttf in $ttfFiles) {
     $dest = Join-Path $fontDir $ttf.Name
-    Copy-Item $ttf.FullName $dest -Force
+    try {
+        Copy-Item $ttf.FullName $dest -Force -ErrorAction Stop
+    } catch {
+        # Typically the file is in use by a running app (Windows Terminal,
+        # VS Code, ...). It is already installed, so the existing copy and its
+        # registration remain valid; skip and continue with the rest.
+        $locked++
+        continue
+    }
     # Register so applications (Windows Terminal, VS Code, ...) can resolve it.
     Set-ItemProperty -Path $regKey -Name $ttf.BaseName -Value $dest
     $installed++
@@ -87,7 +96,10 @@ foreach ($ttf in $ttfFiles) {
 
 Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 
-Write-Step "Installed $installed font file(s) into $fontDir"
+Write-Step "Installed/updated $installed font file(s) into $fontDir"
+if ($locked -gt 0) {
+    Write-Warn "$locked file(s) were in use and left unchanged. Close Windows Terminal, VS Code and other apps using the font, then rerun with -Force to update them."
+}
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "1. Fully close and reopen Windows Terminal so it picks up the new font."
