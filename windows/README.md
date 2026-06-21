@@ -127,8 +127,31 @@ to fetch a different Nerd Font (e.g. `-FontName FiraCode`).
 
 `install.ps1` runs this automatically unless you pass `-SkipFonts`.
 
-After installing, fully restart Windows Terminal and set the profile font face
-to `JetBrainsMono Nerd Font` (or `JetBrainsMono NF`).
+After installing, fully restart Windows Terminal and set the profile font face.
+You can do this automatically with the helper script:
+
+```powershell
+.\windows\set-terminal-font.ps1
+```
+
+It finds `settings.json`, backs it up to `settings.json.bak`, sets
+`profiles.defaults.font.face`, and rewrites any per-profile `font.face`
+overrides so an individual profile cannot fall back to the wrong font. The
+default font name is `JetBrainsMono NF`, which is the exact family name the
+per-user install registers. Override with `-FontFace "<name>"`, or pass
+`-DefaultsOnly` to leave per-profile overrides untouched.
+
+> The registered family name is **not** `JetBrainsMono Nerd Font` — Windows
+> Terminal needs the exact name. List the installed names with:
+>
+> ```powershell
+> Add-Type -AssemblyName System.Drawing
+> [System.Drawing.FontFamily]::Families |
+>     Where-Object { $_.Name -like "*JetBrains*" } |
+>     Select-Object -ExpandProperty Name
+> ```
+
+To set it manually instead, point the profile font face at `JetBrainsMono NF`.
 
 If a corporate proxy blocks the download, grab `JetBrainsMono.zip` from
 <https://github.com/ryanoasis/nerd-fonts/releases/latest> and install the
