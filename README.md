@@ -7,6 +7,8 @@ secrets, and overrides outside the repository.
 
 ## Quick Start
 
+### 1. Install the dotfiles (inside WSL)
+
 Bootstrap from a fresh Ubuntu shell with one command:
 
 ```bash
@@ -33,6 +35,37 @@ For automation:
   --docker wsl-engine \
   --default-shell zsh
 ```
+
+### 2. Call Docker from Windows (optional)
+
+The install above sets up Docker Engine inside WSL, so `docker` already works
+from your WSL shell. To run the same engine from Windows PowerShell or cmd, add
+a tiny `.cmd` shim to your Windows `PATH` (no Docker Desktop, admin, or
+execution-policy changes required). Run this in **Windows PowerShell**:
+
+```powershell
+$bin = "$env:USERPROFILE\bin"
+New-Item -ItemType Directory -Force -Path $bin | Out-Null
+
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if ($userPath -notlike "*$bin*") {
+  [Environment]::SetEnvironmentVariable('Path', "$userPath;$bin", 'User')
+}
+
+@"
+@echo off
+wsl.exe -- docker %*
+"@ | Set-Content -Encoding ascii "$bin\docker.cmd"
+
+@"
+@echo off
+wsl.exe -- docker compose %*
+"@ | Set-Content -Encoding ascii "$bin\docker-compose.cmd"
+```
+
+Open a new terminal and run `docker ps` from Windows to confirm. See
+[windows/README.md](windows/README.md) for details, including how to pin the
+shim to a specific WSL distro.
 
 ## Commands
 
@@ -221,14 +254,16 @@ Preview the refresh without changing system trust:
 This project focuses on WSL2 Ubuntu environment setup. For Windows-side integration:
 
 ### Docker from Windows PowerShell
-To use Docker from Windows PowerShell after installing Docker Engine in WSL:
+For a one-off command, call into WSL directly:
 
 ```powershell
 # From Windows PowerShell
-wsl -d Ubuntu-26.04 docker ps
+wsl -- docker ps
 ```
 
-For full Windows Docker integration, see: https://docs.docker.com/engine/install/wsl/
+For a transparent `docker` command on Windows, use the `.cmd` docker-shim
+helper described in step 2 of the [Quick Start](#2-call-docker-from-windows-optional)
+and detailed in [windows/README.md](windows/README.md).
 
 ### Windows Terminal
 Install Windows Terminal for the best WSL experience:
