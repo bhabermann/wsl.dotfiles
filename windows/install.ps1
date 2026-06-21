@@ -21,7 +21,6 @@ $Tools = @(
     @{ Id = "AgileBits.1Password"; Name = "1Password"; Recommended = $true; Optional = $false; Description = "Secrets app and SSH agent integration." },
     @{ Id = "AgileBits.1Password.CLI"; Name = "1Password CLI"; Recommended = $true; Optional = $false; Description = "Command line access to 1Password." },
     @{ Id = "Starship.Starship"; Name = "Starship"; Recommended = $true; Optional = $false; Description = "Cross-shell prompt support on Windows." },
-    @{ Id = "DEVCOM.JetBrainsMonoNerdFont"; Name = "JetBrains Mono Nerd Font"; Recommended = $true; Optional = $false; Description = "Terminal glyph and font support." },
     @{ Id = "Obsidian.Obsidian"; Name = "Obsidian"; Recommended = $false; Optional = $true; Description = "Optional notes app." }
 )
 
@@ -78,13 +77,12 @@ if (-not (Test-Command winget)) {
 $Selected = New-Object System.Collections.Generic.List[hashtable]
 foreach ($tool in $Tools) {
     if ($SkipDocker -and $tool.Id -eq "Docker.DockerDesktop") { continue }
-    if ($SkipFonts -and $tool.Id -eq "DEVCOM.JetBrainsMonoNerdFont") { continue }
     if ($SkipOptionalApps -and $tool.Optional) { continue }
 
     $install = $false
     if ($NonInteractive) {
         $install = switch ($Preset) {
-            "Minimal" { -not $tool.Optional -and $tool.Id -notin @("Docker.DockerDesktop", "DEVCOM.JetBrainsMonoNerdFont") }
+            "Minimal" { -not $tool.Optional -and $tool.Id -ne "Docker.DockerDesktop" }
             "Recommended" { [bool]$tool.Recommended }
             "All" { $true }
         }
@@ -121,6 +119,23 @@ foreach ($folder in $Folders) {
 
 foreach ($tool in $Selected) {
     Install-WingetPackage -Id $tool.Id -Name $tool.Name
+}
+
+if (-not $SkipFonts) {
+    $installFonts = $true
+    if (-not $NonInteractive) {
+        $answer = Read-Host "Install JetBrains Mono Nerd Font for the current user (no admin)? [Y/n]"
+        if ($answer -match "^[Nn]") { $installFonts = $false }
+    }
+    if ($installFonts) {
+        $fontScript = Join-Path $PSScriptRoot "install-fonts-user.ps1"
+        try {
+            & $fontScript
+        } catch {
+            Write-Warn "Per-user font install failed: $($_.Exception.Message)"
+            Write-Warn "Run windows/install-fonts-user.ps1 manually, or install the font via the Fonts GUI (right-click -> Install)."
+        }
+    }
 }
 
 Write-Step "Validating WSL"

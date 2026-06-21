@@ -109,6 +109,32 @@ For the best WSL experience, install Windows Terminal:
 winget install Microsoft.WindowsTerminal
 ```
 
+## Fonts (no admin required)
+
+The starship prompt relies on Nerd Font glyphs (language icons, git symbols).
+The winget font package (`DEVCOM.JetBrainsMonoNerdFont`) installs machine-wide
+and triggers a UAC/admin prompt. To install the font **for the current user
+only**, with no admin rights, use the helper script instead:
+
+```powershell
+.\windows\install-fonts-user.ps1
+```
+
+It downloads the official JetBrains Mono Nerd Font release and copies the
+`.ttf` files into `%LOCALAPPDATA%\Microsoft\Windows\Fonts`, registering them in
+the per-user (`HKCU`) font store. Pass `-Force` to reinstall, or `-FontName`
+to fetch a different Nerd Font (e.g. `-FontName FiraCode`).
+
+`install.ps1` runs this automatically unless you pass `-SkipFonts`.
+
+After installing, fully restart Windows Terminal and set the profile font face
+to `JetBrainsMono Nerd Font` (or `JetBrainsMono NF`).
+
+If a corporate proxy blocks the download, grab `JetBrainsMono.zip` from
+<https://github.com/ryanoasis/nerd-fonts/releases/latest> and install the
+`.ttf` files via the Fonts GUI (right-click -> **Install**, not "Install for
+all users").
+
 ## Benefits of Manual Setup
 
 - No PowerShell execution policy changes required
