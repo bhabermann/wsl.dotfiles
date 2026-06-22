@@ -1,21 +1,39 @@
 # wsl.dotfiles
 
-Public-safe dotfiles for Ubuntu 26.04 on WSL2 running on Windows 11.
+> 🐧 Ubuntu 26.04 on WSL2 + 🪟 Windows 11
 
-This project is interactive by default and keeps machine-specific identity,
-secrets, and overrides outside the repository.
+Interactive dotfiles that keep secrets, identity, and machine overrides outside the repo.
 
-## Quick Start
+---
 
-### 1. Install the dotfiles (inside WSL)
+## 🚀 Minimum WSL Setup
 
-Bootstrap from a fresh Ubuntu shell with one command:
+Three steps to a working shell: install a Nerd Font, configure Windows Terminal, then run the WSL installer.
+
+### 1️⃣ Install Nerd Font (Windows PowerShell)
+
+```powershell
+.\windows\install-fonts-user.ps1
+```
+
+- No admin rights needed
+- Installs JetBrainsMono NF for Starship icons
+
+### 2️⃣ Set Windows Terminal font (Windows PowerShell)
+
+```powershell
+.\windows\set-terminal-font.ps1
+```
+
+Then fully restart Windows Terminal.
+
+### 3️⃣ Install dotfiles (inside WSL)
 
 ```bash
 git clone https://github.com/bhabermann/wsl.dotfiles.git ~/.dotfiles && cd ~/.dotfiles && ./setup install
 ```
 
-Or use the step-by-step form:
+Or step by step:
 
 ```bash
 git clone https://github.com/bhabermann/wsl.dotfiles.git ~/.dotfiles
@@ -23,7 +41,28 @@ cd ~/.dotfiles
 ./setup install
 ```
 
-For automation:
+---
+
+## 🛠️ Setup Commands
+
+```bash
+./setup install      # install / configure
+./setup verify       # show installed state
+./setup doctor       # health checks
+./setup update       # update packages
+./setup uninstall    # remove managed files
+```
+
+Handy flags:
+
+```bash
+./setup install --dry-run          # preview only
+./setup install --no-doctor        # skip final checks
+./setup install --reconfigure      # re-run choices
+./setup install --default-shell zsh
+```
+
+Non-interactive example:
 
 ```bash
 ./setup install \
@@ -36,12 +75,71 @@ For automation:
   --default-shell zsh
 ```
 
-### 2. Call Docker from Windows (optional)
+---
 
-The install above sets up Docker Engine inside WSL, so `docker` already works
-from your WSL shell. To run the same engine from Windows PowerShell or cmd, add
-a tiny `.cmd` shim to your Windows `PATH` (no Docker Desktop, admin, or
-execution-policy changes required). Run this in **Windows PowerShell**:
+## 📦 What Gets Installed
+
+### Base system
+
+Every real install first bootstraps these Ubuntu packages:
+
+```text
+build-essential curl wget git openssh-client ca-certificates openssl gnupg jq unzip zip less locales
+software-properties-common xdg-utils libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata
+```
+
+Then the CA refresh runs before any network-heavy tools.
+
+### Tool groups
+
+| Group | Description |
+| --- | --- |
+| `shell` | zsh, Starship, zoxide, fzf, zsh plugins |
+| `modern-cli` | ripgrep, fd, bat, eza, tree, tmux, jq, gh, yq |
+| `runtime` | mise-managed node, dotnet, python, go, uv, java |
+| `history` | Atuin enhanced shell history |
+| `corporate-ca` | TLS interception CA refresh |
+
+Recommended defaults are `shell`, `modern-cli`, and `runtime`.
+
+Runtimes are managed by `mise`:
+
+- `node@24.17.0`
+- `dotnet@10.0.301`
+- `python@3.13.14`
+- `go@1.26.3`
+- `uv@0.11.21`
+- `java@21`
+
+### Docker
+
+```bash
+./setup install --docker wsl-engine   # default: Docker Engine inside WSL
+./setup install --docker desktop      # Docker Desktop integration
+./setup install --docker none         # skip Docker
+```
+
+---
+
+## 🪟 Windows Integration
+
+### Windows Terminal
+
+Install if needed:
+
+```powershell
+winget install Microsoft.WindowsTerminal
+```
+
+Then run the font helper and restart the terminal:
+
+```powershell
+.\windows\set-terminal-font.ps1
+```
+
+### Docker from Windows
+
+If you installed Docker Engine inside WSL (`--docker wsl-engine`), `docker ps` works in WSL. To use that same engine from Windows without Docker Desktop, add a `cmd` shim:
 
 ```powershell
 $bin = "$env:USERPROFILE\bin"
@@ -52,146 +150,34 @@ if ($userPath -notlike "*$bin*") {
   [Environment]::SetEnvironmentVariable('Path', "$userPath;$bin", 'User')
 }
 
-@"
+$docker = @"
 @echo off
 wsl.exe -- docker %*
-"@ | Set-Content -Encoding ascii "$bin\docker.cmd"
-
-@"
+"@
+$compose = @"
 @echo off
 wsl.exe -- docker compose %*
-"@ | Set-Content -Encoding ascii "$bin\docker-compose.cmd"
+"@
+
+$docker | Set-Content -Encoding ascii "$bin\docker.cmd"
+$compose | Set-Content -Encoding ascii "$bin\docker-compose.cmd"
 ```
 
-Open a new terminal and run `docker ps` from Windows to confirm. See
-[windows/README.md](windows/README.md) for details, including how to pin the
-shim to a specific WSL distro.
+Open a new terminal and run `docker ps` from Windows.
 
-## Commands
+Quick one-off without a shim:
 
-```bash
-./setup install
-./setup verify
-./setup doctor
-./setup update
-./setup uninstall
+```powershell
+wsl -- docker ps
 ```
 
-Useful install options:
+See [windows/README.md](windows/README.md) for details.
 
-```bash
-./setup install --dry-run
-./setup install --no-doctor
-./setup install --reconfigure
-```
+---
 
-- `--dry-run` previews the environment, identity, tool choices, Docker strategy,
-  and installation plan without creating files, links, backups, or installing
-  tools.
-- `--no-doctor` skips the final doctor checks after a normal install.
-- `--default-shell zsh` or `--default-shell bash` selects the login shell. Interactive installs ask
-  before changing the login shell; non-interactive installs leave it unchanged
-  unless this option is provided.
-- `--reconfigure` edits saved setup choices. Prompts show the saved value as the
-  default, so pressing Enter keeps the current selection.
+## 🔐 Profiles & Secrets
 
-Every real install first bootstraps the Ubuntu packages that later setup steps
-assume are present:
-
-```text
-build-essential curl wget git openssh-client ca-certificates openssl gnupg jq unzip zip less locales software-properties-common xdg-utils libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata
-```
-
-Dependency setup appears in the installation plan, but it is not a selectable
-or persisted tool group.
-
-Immediately after those Ubuntu packages are present, setup runs the CA refresh
-before installing runtimes, Docker, or other network-heavy tools.
-
-The runtime libraries include the native ICU, SSL, Kerberos, timezone, and
-compression dependencies required by mise-managed .NET. The installer also
-provides `wslview`; commands honoring `BROWSER` open URLs in the default Windows
-browser through `explorer.exe`.
-
-After a real install, setup saves the selected profile, tool groups, Docker
-strategy, and default-shell choice under `~/.config/dotfiles/`. Plain reruns
-reuse those choices and skip onboarding prompts, then show the final
-installation confirmation in interactive mode.
-
-Explicit flags such as `--profile`, `--tools`, `--with`, `--without`,
-`--docker`, and `--default-shell` override the saved baseline for that run and
-are persisted after a real install.
-
-Existing Git identity values are detected and displayed. Interactive reruns ask
-whether to change them and default to preserving them; explicit `--git-name`
-and `--git-email` flags update the managed identity.
-
-## Interactive Tool Selection
-
-The installer asks which groups to install. Each prompt includes a yes/no
-choice, a recommendation tag when applicable, and a short explanation.
-The interactive flow is grouped into sections: Environment, Identity, Tool
-Selection, Docker, Installation Plan, Installation, Linking, and Doctor.
-On reruns, existing local setup choices and Git identity are shown and
-preserved instead of being requested again. `./setup install --reconfigure`
-asks the setup questions again with saved values preselected.
-
-Example:
-
-```text
-[Y/n] Shell       (Recommended) zsh, Starship, zoxide, fzf, and pinned plugins for a fast interactive shell.
-[y/N] History                   Atuin enhanced searchable shell history.
-```
-
-Recommended groups:
-
-- `shell`: zsh, prompt, navigation, fuzzy search, and plugins.
-- `modern-cli`: apt-installed search/listing/readability tools, GitHub CLI, YAML/JSON tools, and tmux.
-- `runtime`: mise-managed global `node@24.17.0`, `dotnet@10.0.301`, `python@3.13.14`, `go@1.26.3`, `uv@0.11.21`, and `java@21`.
-
-Optional groups:
-
-- `history`: Atuin.
-- `corporate-ca`: explicit rerun of the CA refresh for TLS interception CAs.
-
-The CA refresh also runs automatically after dependency setup on every real
-install.
-
-## Package Policy
-
-Ubuntu apt owns WSL system tools and general CLIs. That includes `zsh`, `fzf`,
-`direnv`, `starship`, `zoxide`, `zsh-autosuggestions`,
-`zsh-syntax-highlighting`, `atuin`, `ripgrep`, `fd-find`, `bat`, `tree`,
-`tmux`, `jq`, `gh`, `eza`, and `yq`. `zsh-completions` remains a Git-installed
-exception because Ubuntu 26.04 does not package it.
-
-Both Bash and Zsh are configured regardless of the selected login shell. Setup
-keeps `~/.bashrc` and `~/.zshrc` as regular user-owned files and maintains one
-small source block in each. Shared environment, PATH, aliases, profile loading,
-and local overrides live under `~/.config/dotfiles/shell/`; shell-specific
-history, completion, hooks, plugins, and prompt setup remain separate. Rerunning
-setup repairs missing or malformed managed source blocks while preserving user
-content outside those blocks.
-
-mise is installed from its official Ubuntu 26.04 PPA and owns globally
-available developer language runtimes and project version switching for
-`node`, `dotnet`, `python`, `go`, `uv`, and `java`. The managed defaults are
-`node@24.17.0`, `dotnet@10.0.301`, `python@3.13.14`, `go@1.26.3`,
-`uv@0.11.21`, and `java@21`. The installer links
-the global mise config into `~/.config/mise/`, keeps `~/.local/bin` and
-`~/.local/share/mise/shims` on `PATH`, activates mise from both Bash and Zsh,
-and installs the managed global toolchain during setup so new shells should not
-require a manual `mise install`.
-
-Docker is selected with one strategy prompt:
-
-- WSL Docker Engine: recommended default, installs Docker Engine inside WSL.
-- Docker Desktop: optionally verifies Windows-side WSL integration.
-- None: skips Docker setup.
-
-## Profiles and Secrets
-
-Repo-managed templates:
+Repo templates:
 
 - `profiles/personal.env`
 - `profiles/work.env`
@@ -210,127 +196,51 @@ Machine-local files:
 - `~/.config/git/identity.gitconfig`
 - `~/.ssh/config`
 
-The installer creates local files only when missing.
+Setup only creates local files when they are missing.
 
-## When Corporate CA Is Needed
+---
 
-Some networks intercept TLS and present a locally trusted CA. Setup runs the CA
-refresh immediately after Ubuntu base packages are installed, before `mise`,
-Docker, or other network-heavy setup. Runtime installation also verifies the
-`mise-versions.jdx.dev` HTTPS path before `mise install` and retries CA refresh
-once if TLS verification fails. If tools such as `curl`, `git`, `mise`, `npm`,
-package installers, or Docker setup still fail with certificate verification
-errors, review `~/.config/dotfiles/corporate-ca.env` and rerun:
+## 🏢 Corporate CA
+
+If TLS interception breaks `curl`, `git`, `mise`, or `npm`, setup can refresh CA certificates from Windows stores.
 
 ```bash
 ./scripts/update-corporate-ca --config ~/.config/dotfiles/corporate-ca.env
 ```
 
-The installer copies
-`templates/dotfiles/corporate-ca.env.template` to
-`~/.config/dotfiles/corporate-ca.env` when missing. The default config targets
-the public download hosts used by this installer. Put any machine-local
-hostnames, test URLs, or subject/issuer allowlist regex there. The repository
-intentionally does not include company-specific hosts or certificate authority
-names.
-
-On WSL, the refresh checks Windows certificate stores such as
-`Cert:\LocalMachine\Root` and `Cert:\CurrentUser\Root`. It installs only CA
-certificates whose subject matches an issuer from the configured host
-certificate chains, CA certificates presented by configured host chains, or CA
-certificates that match your local allowlist. This handles the common case
-where a local root CA is trusted by Windows but not yet installed in Ubuntu,
-which can otherwise break tools like `mise` with `unable to get local issuer
-certificate`.
-
-Preview the refresh without changing system trust:
+Preview without changes:
 
 ```bash
 ./scripts/update-corporate-ca --config ~/.config/dotfiles/corporate-ca.env --dry-run
 ```
 
-## Windows Integration
+The template is `templates/dotfiles/corporate-ca.env.template`.
 
-This project focuses on WSL2 Ubuntu environment setup. For Windows-side integration:
+---
 
-### Docker from Windows PowerShell
-For a one-off command, call into WSL directly:
-
-```powershell
-# From Windows PowerShell
-wsl -- docker ps
-```
-
-For a transparent `docker` command on Windows, use the `.cmd` docker-shim
-helper described in step 2 of the [Quick Start](#2-call-docker-from-windows-optional)
-and detailed in [windows/README.md](windows/README.md).
-
-### Windows Terminal
-Install Windows Terminal for the best WSL experience:
-```powershell
-winget install Microsoft.WindowsTerminal
-```
-
-### Corporate CA Certificates
-If your network uses TLS interception, you may need to import corporate CA certificates into Windows. Run this from Windows PowerShell (requires admin rights):
-
-```powershell
-# Import corporate CA into Windows trust store
-certutil -addstore -f "ROOT" "path\to\corporate-ca.crt"
-```
-
-The WSL setup includes automatic CA certificate handling for Linux. Windows-side certificate import is manual and optional.
-
-## Docker
-
-Docker Engine inside WSL is the recommended default:
-
-```bash
-./setup install --docker wsl-engine
-```
-
-Docker Desktop integration remains available as an explicit opt-in:
-
-```bash
-./setup install --docker desktop
-```
-
-## Test Pipeline
-
-Run the Docker test pipeline from the repo root:
+## 🧪 Test Pipeline
 
 ```bash
 ./scripts/test-docker.sh
 ```
 
-Docker Engine must be running inside WSL. Setup enables its systemd service and
-adds a managed PowerShell `docker` function that forwards to this WSL distro.
-The test script uses `docker` when available
-and can still fall back to `docker.exe` when Docker Desktop integration is used.
-If Docker group membership was added during setup but the current shell session
-is stale, the Docker test wrapper re-enters through `newgrp docker` so the test
-command can run without requiring a manual logout/login cycle first.
+Tests run in an Ubuntu 26.04 container and cover:
 
-The pipeline builds `Dockerfile.test` with Ubuntu 26.04 and runs:
+- Bash syntax checks
+- Setup help / smoke test
+- Tool selection parser
+- Non-interactive install
+- Dry-run and no-doctor behavior
+- zsh startup checks
+- Idempotency
+- `verify` and `doctor`
 
-- Bash syntax checks.
-- `./setup help` smoke test.
-- Tool selection parser tests for presets, `--with`, `--without`, and Docker strategy.
-- Non-interactive install in `DOTFILES_TEST_MODE=1` with an isolated fake home.
-- Dry-run and no-doctor behavior checks.
-- zsh startup checks for repo root detection, aliases, and module loading.
-- Idempotency checks that local identity and SSH config are not overwritten.
-- `verify` and `doctor` smoke tests.
+---
 
-`DOTFILES_TEST_MODE=1` skips package downloads, external installers, Docker Engine
-changes, and Windows/WSL integration checks so the container can validate behavior
-without mutating the host or depending on Windows APIs.
+## 🤝 Contributing
 
-## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the repository policy and validation
-checks.
-
-## License
+## 📄 License
 
 MIT. See [LICENSE](LICENSE).
