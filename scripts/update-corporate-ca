@@ -478,8 +478,11 @@ PWSH
     is_valid_x509 "$pem" || continue
     is_ca_true "$pem" || { debug "Skipping non-CA Windows certificate: $(subject_line "$pem")"; continue; }
     subj="$(subject_line "$pem")"
-    if ! matches_allowlist "$pem" && ! subject_is_needed_issuer "$subj"; then
-      debug "Skipping Windows CA that is not a configured host issuer: $subj"
+    # When ALLOWLIST_REGEX is set, only import CAs matching it.
+    # When empty (default), import all CA:TRUE certs from Windows stores
+    # so corporate CAs are trusted without manual host configuration.
+    if allowlist_configured && ! matches_allowlist "$pem"; then
+      debug "Skipping Windows CA that does not match allowlist: $subj"
       continue
     fi
     install_cert_pem "$pem" && installed=$((installed + 1))
@@ -490,7 +493,7 @@ PWSH
   elif [[ "$installed" -gt 0 ]]; then
     sudo update-ca-certificates
   else
-    debug "No allowlisted Windows CA certificates were installed."
+    debug "No Windows CA certificates were installed."
   fi
 }
 
