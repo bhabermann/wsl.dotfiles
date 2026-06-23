@@ -8,6 +8,11 @@ Interactive dotfiles that keep secrets, identity, and machine overrides outside 
 
 ## 🚀 Minimum WSL Setup
 
+> Starting from a clean Windows install? See
+> [windows/README.md](windows/README.md#install-wsl--ubuntu-2604) for how to
+> install the WSL2 platform, register a named `Ubuntu-26.04` distro, and set it
+> as the default before continuing below.
+
 Three steps to a working shell: install a Nerd Font, configure Windows Terminal, then run the WSL installer.
 
 ### 1️⃣ Install Nerd Font (Windows PowerShell)

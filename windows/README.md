@@ -2,6 +2,52 @@
 
 This directory previously contained automatic Windows integration scripts that required PowerShell execution policy changes and administrative access. These have been removed in favor of simpler, manual setup approaches.
 
+## Install WSL + Ubuntu 26.04
+
+Run these from **Windows PowerShell** on a fresh machine. `wsl --install` does not
+require admin on Windows 11, but may prompt for a reboot the first time the WSL
+platform is enabled.
+
+```powershell
+# 1. Enable the WSL2 platform + kernel (one-time on a fresh machine).
+#    --no-distribution skips the default Ubuntu so you can pick a named one.
+wsl --install --no-distribution
+
+# 2. Confirm Ubuntu-26.04 is offered by your catalog.
+wsl --list --online
+
+# 3. Install Ubuntu 26.04 as a NAMED distro. Registering it under this exact
+#    name is what the docker shim's "pin to a specific distro" option targets.
+wsl --install -d Ubuntu-26.04
+
+# 4. Make it the default so `wsl` and the docker shim hit it automatically.
+wsl --set-default Ubuntu-26.04
+
+# 5. Launch it and create your Unix user.
+wsl -d Ubuntu-26.04
+```
+
+Inside the new distro, finish the package update and install the dotfiles:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+git clone https://github.com/bhabermann/wsl.dotfiles.git ~/.dotfiles \
+  && cd ~/.dotfiles && ./setup install
+```
+
+Verify from Windows:
+
+```powershell
+wsl --status          # Default Distribution: Ubuntu-26.04
+wsl --list --verbose  # Ubuntu-26.04 should carry the * marker
+```
+
+> Catalog names in `wsl --list --online` shift over time. If `Ubuntu-26.04` is
+> not listed, `wsl --install -d Ubuntu` grabs the current latest Ubuntu (today
+> 26.04) but registers it as `Ubuntu` rather than `Ubuntu-26.04` — the named
+> install above is the more deterministic path and matches the docker-shim
+> examples in this document.
+
 ## Docker Integration
 
 After `./setup install` installs Docker Engine inside WSL, you can call it from
