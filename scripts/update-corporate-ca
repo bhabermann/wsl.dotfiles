@@ -244,6 +244,15 @@ subject_is_needed_issuer() {
   grep -Fqx "$subject" "$NEEDED_ISSUER_SUBJECTS_FILE"
 }
 
+is_expired() {
+  local pem="$1" exp now
+  exp="$(enddate_line "$pem")"
+  [[ -n "$exp" ]] || return 1
+  now="$(date -u +%Y%m%d%H%M%S)"
+  exp_norm="$(date -u -d "$exp" +%Y%m%d%H%M%S 2>/dev/null)" || return 1
+  [[ "$exp_norm" -lt "$now" ]]
+}
+
 install_cert_pem() {
   local pem="$1" fp dest subj iss exp
   fp="$(sha256_fp "$pem")"
@@ -253,6 +262,11 @@ install_cert_pem() {
   subj="$(subject_line "$pem")"
   iss="$(issuer_line "$pem")"
   exp="$(enddate_line "$pem")"
+
+  if is_expired "$pem"; then
+    warn "Skipping expired CA certificate (expired $exp): $subj"
+    return 1
+  fi
 
   if [[ -f "$dest" ]]; then
     debug "Already installed: $dest"
