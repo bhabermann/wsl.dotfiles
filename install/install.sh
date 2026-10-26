@@ -21,6 +21,7 @@ action_install() {
   if [[ "$DRY_RUN" == 1 ]]; then ok "Dry run: no changes made"; return; fi
   if [[ "$NON_INTERACTIVE" == 0 ]]; then confirm "Install these components?" Y || die "Cancelled"; fi
   if [[ "${DOTFILES_TEST_MODE:-0}" != 1 ]]; then
+    save_git_identity
     require_sudo
     sudo env DEBIAN_FRONTEND=noninteractive apt-get update
     sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl git openssh-client \
@@ -60,6 +61,14 @@ resolve_identity() {
   fi
   [[ -n "$GIT_NAME" && -n "$GIT_EMAIL" ]] || die "Provide --git-name and --git-email, or configure your existing Git identity."
 }
+save_git_identity() {
+  mkdir -p "$HOME/.config/git"
+  local identity="$HOME/.config/git/identity.gitconfig"
+  copy_template_if_missing "$DOTFILES_ROOT/templates/git/identity.gitconfig.template" "$identity"
+  git -C "$HOME" config --file "$identity" user.name "$GIT_NAME"
+  git -C "$HOME" config --file "$identity" user.email "$GIT_EMAIL"
+}
+
 install_tool() {
   local tool="$1" package="$1"
   if is_runtime "$tool"; then
@@ -71,9 +80,10 @@ install_tool() {
     esac
     local version
     version="$(awk -v key="$tool" '$1 == key {gsub(/"/,"",$3); print $3}' "$DOTFILES_ROOT/mise/default-tools.toml")"
-    [[ -n "$version" ]] || die "No pinned version for $tool"
-    mise use --global "$tool@$version"
-    mise where "$tool@$version" >/dev/null
+    local request="$tool"
+    [[ -z "$version" ]] || request="$tool@$version"
+    mise use --global "$request"
+    mise where "$request" >/dev/null
     return
   fi
   if [[ "$tool" == mise ]]; then install_mise; return; fi

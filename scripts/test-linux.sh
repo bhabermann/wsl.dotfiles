@@ -33,6 +33,40 @@ grep -qx python "$HOME/.config/dotfiles/selected-tools"
 grep -qx fd "$HOME/.config/dotfiles/selected-tools"
 "$root/setup" "${arguments[@]}" --tools recommended > "$test_root/recommended"
 ! grep -Eq '^(node|dotnet|python|go|uv|java)$' "$HOME/.config/dotfiles/selected-tools"
+(
+  source "$root/lib/tools.sh"
+  source "$root/install/install.sh"
+  DOTFILES_ROOT="$root"
+  install_mise() { :; }
+  sudo() { :; }
+  mise() { printf '%s\n' "$*" >> "$test_root/runtime-requests"; }
+  install_tool python
+  install_tool java
+  install_tool node
+)
+grep -qx 'use --global python' "$test_root/runtime-requests"
+grep -qx 'where java' "$test_root/runtime-requests"
+grep -qx 'use --global node@24.17.0' "$test_root/runtime-requests"
+set +e
+(
+  set -e
+  export HOME="$test_root/failing-home"
+  mkdir -p "$HOME"
+  source "$root/lib/common.sh"
+  source "$root/lib/tools.sh"
+  source "$root/install/install.sh"
+  DOTFILES_ROOT="$root" DOTFILES_TEST_MODE=0 NON_INTERACTIVE=1
+  GIT_NAME='Saved Before Failure' GIT_EMAIL=saved@example.invalid
+  TOOLS_PRESET=minimal DRY_RUN=0 DOCKER_STRATEGY=none DEFAULT_SHELL=zsh
+  WITH_ITEMS=() WITHOUT_ITEMS=()
+  is_debian_13() { return 0; }
+  require_sudo() { return 42; }
+  action_install
+) > "$test_root/failing-install" 2>&1
+status=$?
+set -e
+test "$status" = 42
+test "$(git config --file "$test_root/failing-home/.config/git/identity.gitconfig" user.name)" = 'Saved Before Failure'
 bash --noprofile --rcfile "$HOME/.bashrc" -ic 'test -n "$DOTFILES"' 2>/dev/null
 mkdir -p "$test_root/bin"
 cat > "$test_root/bin/docker" <<'EOF'

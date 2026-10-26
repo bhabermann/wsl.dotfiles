@@ -1,4 +1,4 @@
-# wsl.dotfiles — one account
+# wsl.dotfiles â€” one account
 
 A lean Debian 13 WSL 2 development environment for Windows 11 x64: one Linux
 user, one Git identity, zsh, and Docker Engine. Windows setup runs without
@@ -57,7 +57,8 @@ Choose individual optional tools: `ripgrep`, `fd`, `bat`, `eza`, `jq`, `yq`,
 
 No language runtime is installed by default. The recommended Linux preset adds
 ripgrep, fd, bat, eza, jq, gh, tmux, and direnv. Mise installs only the selected
-runtimes, using the versions in `mise/default-tools.toml`.
+runtimes. Versions listed in `mise/default-tools.toml` are pinned; optional
+Python and Java use mise defaults when no version is listed.
 
 Inside the new distro:
 
