@@ -1,41 +1,33 @@
-# Zsh-specific interactive-shell configuration.
-
+# Only inspect distro/local binaries: probing absent tools across the Windows
+# PATH is expensive on WSL. Windows interoperability remains available.
 source "$HOME/.config/dotfiles/shell/shared.sh"
-
 HISTFILE="${HISTFILE:-$HOME/.zsh_history}"
 HISTSIZE=50000
 SAVEHIST=50000
-setopt HIST_IGNORE_ALL_DUPS SHARE_HISTORY INC_APPEND_HISTORY
-setopt HIST_REDUCE_BLANKS HIST_VERIFY EXTENDED_HISTORY
-
+setopt HIST_IGNORE_ALL_DUPS SHARE_HISTORY HIST_REDUCE_BLANKS HIST_VERIFY EXTENDED_HISTORY
+bindkey -e
+bindkey '^[[A' history-beginning-search-backward
+bindkey '^[[B' history-beginning-search-forward
 fpath=("$HOME/.zsh/plugins/zsh-completions/src" $fpath)
 autoload -Uz compinit
 mkdir -p "$HOME/.cache"
 compinit -C -d "$HOME/.cache/zcompdump"
-
-if [[ -x /usr/bin/mise ]]; then
-  eval "$(/usr/bin/mise activate zsh)" 2>/dev/null || true
-elif command -v mise >/dev/null 2>&1; then
-  eval "$(mise activate zsh)" 2>/dev/null || true
-elif [[ -x "$HOME/.local/bin/mise" ]]; then
-  eval "$("$HOME/.local/bin/mise" activate zsh)" 2>/dev/null || true
+zstyle ':completion:*' menu select
+if [[ "${DOTFILES_MISE_ACTIVATE:-0}" == 1 && -x /usr/bin/mise ]]; then
+  eval "$(/usr/bin/mise activate zsh)"
+elif [[ "${DOTFILES_MISE_ACTIVATE:-0}" == 1 && -x "$HOME/.local/bin/mise" ]]; then
+  eval "$("$HOME/.local/bin/mise" activate zsh)"
 fi
-
-command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
-command -v atuin >/dev/null 2>&1 && eval "$(atuin init zsh)"
-command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"
-
-ZSH_PLUGIN_DIR="$HOME/.zsh/plugins"
-if [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
+[[ ! -x /usr/bin/zoxide ]] || eval "$(/usr/bin/zoxide init zsh)"
+[[ ! -x /usr/bin/direnv ]] || eval "$(/usr/bin/direnv hook zsh)"
+# Slim rootfs excludes documentation, including Debian's example scripts.
+[[ ! -x /usr/bin/fzf ]] || eval "$(/usr/bin/fzf --zsh)"
+[[ ! -x /usr/bin/atuin ]] || eval "$(/usr/bin/atuin init zsh)"
+if [[ -r /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
   source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-elif [[ -f "$ZSH_PLUGIN_DIR/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
-  source "$ZSH_PLUGIN_DIR/zsh-autosuggestions/zsh-autosuggestions.zsh"
 fi
-
-if [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+if [[ "$TERM" != dumb && -x /usr/bin/starship ]]; then eval "$(/usr/bin/starship init zsh)"; fi
+# Load after all widgets have been registered.
+if [[ -r /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
   source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-elif [[ -f "$ZSH_PLUGIN_DIR/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
-  source "$ZSH_PLUGIN_DIR/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 fi
-
-command -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"

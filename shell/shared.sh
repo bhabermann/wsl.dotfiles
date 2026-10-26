@@ -17,15 +17,6 @@ export PAGER="${PAGER:-less -FRX}"
 export BROWSER="${BROWSER:-wslview}"
 
 DOTFILES_CFG_DIR="$HOME/.config/dotfiles"
-PROFILE_FILE="$DOTFILES_CFG_DIR/profile"
-
-if [[ -f "$PROFILE_FILE" ]]; then
-  _dotfiles_profile="$(tr -d '[:space:]' < "$PROFILE_FILE")"
-  if [[ -n "$_dotfiles_profile" && -f "$DOTFILES/profiles/${_dotfiles_profile}.env" ]]; then
-    source "$DOTFILES/profiles/${_dotfiles_profile}.env"
-  fi
-fi
-
 [[ -f "$DOTFILES_CFG_DIR/local.env" ]] && source "$DOTFILES_CFG_DIR/local.env"
 [[ -f "$DOTFILES_CFG_DIR/secrets.env" ]] && source "$DOTFILES_CFG_DIR/secrets.env"
 
@@ -50,15 +41,15 @@ path_prepend "$HOME/.local/share/mise/shims"
 path_append "/usr/local/bin"
 export PATH
 
-command -v fdfind >/dev/null 2>&1 && alias fd="fdfind"
-command -v batcat >/dev/null 2>&1 && alias bat="batcat"
+[[ -x /usr/bin/fdfind ]] && alias fd="fdfind"
+[[ -x /usr/bin/batcat ]] && alias bat="batcat"
 alias ll="ls -la"
 alias gst="git status"
 alias gco="git checkout"
 alias gcb="git checkout -b"
 alias glg="git log --oneline --graph --decorate --all"
-command -v eza >/dev/null 2>&1 && alias ls="eza"
-command -v bat >/dev/null 2>&1 && alias cat="bat"
-command -v rg >/dev/null 2>&1 && alias grep="rg"
+[[ -x /usr/bin/eza ]] && alias ls="eza"
+[[ -x /usr/bin/bat || -x /usr/bin/batcat ]] && alias cat="bat"
+[[ -x /usr/bin/rg ]] && alias grep="rg"
 
-unset _dotfiles_profile _dotfiles_root_file
+unset _dotfiles_root_file

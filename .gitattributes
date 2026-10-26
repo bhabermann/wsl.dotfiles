@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.sh text eol=lf
+setup text eol=lf
+scripts/wslview text eol=lf
+scripts/docker-wsl text eol=lf
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf

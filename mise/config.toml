@@ -1,9 +1,2 @@
 [settings]
-experimental = true
 idiomatic_version_file_enable_tools = ["node", "python", "java", "dotnet", "go", "uv"]
-
-[tools]
-node = "24.17.0"
-dotnet = "10.0.301"
-go = "1.26.3"
-uv = "0.11.21"

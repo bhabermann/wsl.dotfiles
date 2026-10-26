@@ -1,0 +1,13 @@
+{
+  "rootfs": {
+    "distribution": "Debian 13 trixie-slim",
+    "architecture": "amd64",
+    "url": "https://raw.githubusercontent.com/debuerreotype/docker-debian-artifacts/cee78df586385250331cacba8fd1140133c054e5/trixie/slim/oci/blobs/rootfs.tar.gz",
+    "sha256": "f2be67225471500c788ce88c597eb5ea8336e912ad1ca4815650e0281afe2034"
+  },
+  "font": {
+    "version": "3.5.1",
+    "url": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/JetBrainsMono.zip",
+    "sha256": "fab782a66f7d3019da64f6572db9fc5d3a4bcb19f9fa13e2d8a62e3693d6396e"
+  }
+}
