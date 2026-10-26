@@ -1,0 +1,28 @@
+.gitignore
+  h_16f42e4034fc35 7
+README.md
+  h_16f42e4034fc35 1,60-61
+git/gitconfig
+  h_16f42e4034fc35 14,21-72
+install/install.sh
+  h_16f42e4034fc35 24,64-71,83-86
+scripts/test-linux.sh
+  h_16f42e4034fc35 36-69
+windows/README.md
+  h_16f42e4034fc35 1-24
+windows/install-fonts-user.ps1
+  h_16f42e4034fc35 1-106
+windows/set-terminal-font.ps1
+  h_16f42e4034fc35 1-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "12a90eb83bb6a56f5d8e8a2cfbbe50a2d366fd72",
+  "prompts": {},
+  "humans": {
+    "h_16f42e4034fc35": {
+      "author": "Bruno Habermann <7130275+bhabermann@users.noreply.github.com>"
+    }
+  }
+}
