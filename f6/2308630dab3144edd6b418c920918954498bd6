@@ -1,0 +1,84 @@
+.gitattributes
+  h_16f42e4034fc35 1-7
+CONTRIBUTING.md
+  h_16f42e4034fc35 3-5,7,10-16,19-22
+Dockerfile.test
+  h_16f42e4034fc35 1,3,6-7
+README.md
+  h_16f42e4034fc35 1,3-5,7,9,11-12,15-19,21-24,26,28-31,33-34,37-40,42-45,47,49-52,54-56,58-60,62,65-72,75-80,82-85,87-92,94-97,99-104,106,109-112,115-117,119-122,124-126,128,130-132,135-140,143-144,147-149,151-153
+docs/spec.md
+  h_16f42e4034fc35 1-24
+docs/validation.md
+  h_16f42e4034fc35 1-42
+install/doctor.sh
+  h_16f42e4034fc35 5-6
+install/install.sh
+  h_16f42e4034fc35 3-39,41-43,45-70,72-86,88-106
+install/link.sh
+  h_16f42e4034fc35 5-9,15,17-19,24
+install/plugins.sh
+  h_16f42e4034fc35 3-11
+install/uninstall.sh
+  h_16f42e4034fc35 4-12
+install/verify.sh
+  h_16f42e4034fc35 3-11
+lib/common.sh
+  h_16f42e4034fc35 50,53
+lib/tools.sh
+  h_16f42e4034fc35 2-7,10-18,22-24,26-30,33-39,41,43-45,47-49,51-52,54
+scripts/docker-wsl
+  h_16f42e4034fc35 1-92
+scripts/test-docker-client.ps1
+  h_16f42e4034fc35 1-14
+scripts/test-docker.sh
+  h_16f42e4034fc35 3-8
+scripts/test-in-docker.sh
+  h_16f42e4034fc35 3-4
+scripts/test-linux.sh
+  h_16f42e4034fc35 1-68
+scripts/test-windows.ps1
+  h_16f42e4034fc35 1-143
+scripts/test-wsl.ps1
+  h_16f42e4034fc35 1-98
+setup
+  h_16f42e4034fc35 7-10,13-16,18-20,22-24,26-31,34-35,37-56,59-63,65-66,68-69,71,74
+shell/bashrc
+  h_16f42e4034fc35 17-20,22-26
+shell/shared.sh
+  h_16f42e4034fc35 44-45,51-53,55
+shell/zshrc
+  h_16f42e4034fc35 1-2,7-10,15-19,21-26,29-31
+starship/starship.toml
+  h_16f42e4034fc35 2-5,7,10-11,13-26
+templates/dotfiles/local.env.template
+  h_16f42e4034fc35 1-5
+windows/Bootstrap.psm1
+  h_16f42e4034fc35 1-316
+windows/assets.lock.json
+  h_16f42e4034fc35 1-13
+windows/copy-source.sh
+  h_16f42e4034fc35 1-8
+windows/install.ps1
+  h_16f42e4034fc35 2,4-12,14-28,30-34,36-51,54-78,80-88,91-93,95-108,110-120,122-133,135-146,148-162
+windows/profile.ps1
+  h_16f42e4034fc35 1-6,8-23,25-36,38
+windows/provision.sh
+  h_16f42e4034fc35 1-38
+windows/run-setup.sh
+  h_16f42e4034fc35 1-20
+windows/terminal-profile.json
+  h_16f42e4034fc35 1-29
+zsh/zshrc
+  h_16f42e4034fc35 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f62308630dab3144edd6b418c920918954498bd6",
+  "prompts": {},
+  "humans": {
+    "h_16f42e4034fc35": {
+      "author": "Bruno Habermann <7130275+bhabermann@users.noreply.github.com>"
+    }
+  }
+}
