@@ -1,178 +1,75 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 DOTFILES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export DOTFILES_ROOT
-
 source "$DOTFILES_ROOT/lib/common.sh"
 source "$DOTFILES_ROOT/lib/tools.sh"
-
-COMMAND="install"
-NON_INTERACTIVE=0
-PROFILE=""
-GIT_NAME=""
-GIT_EMAIL=""
-GIT_NAME_FLAG=0
-GIT_EMAIL_FLAG=0
-GIT_IDENTITY_WRITE=0
-TOOLS_PRESET="recommended"
-DOCKER_STRATEGY=""
-DEFAULT_SHELL=""
-RECONFIGURE=0
-VERBOSE=0
-LOG_ENABLED=0
-DRY_RUN=0
-NO_DOCTOR=0
-PROFILE_FLAG=0
-TOOLS_FLAG=0
-DOCKER_FLAG=0
-DEFAULT_SHELL_FLAG=0
-WITH_ITEMS=()
-WITHOUT_ITEMS=()
-
+COMMAND=install NON_INTERACTIVE=0 DRY_RUN=0 RECONFIGURE=0 NO_DOCTOR=0
+GIT_NAME="" GIT_EMAIL="" TOOLS_PRESET="" DEFAULT_SHELL=zsh DOCKER_STRATEGY=wsl-engine
+WITH_ITEMS=() WITHOUT_ITEMS=()
+DOCKER_FLAG=0 DEFAULT_SHELL_FLAG=0
 usage() {
   cat <<'EOF'
-Usage: ./setup [COMMAND] [OPTIONS]
-
-Commands:
-  install              Install selected dotfiles components (default)
-  verify               Verify the environment
-  doctor               Show human-readable diagnostics
-  update               Re-run selected installation steps
-  uninstall            Print uninstall guidance
-  help                 Show this help
-
-Options:
-  --non-interactive             Do not prompt; require explicit required values
-  --profile work|personal       Select profile
-  --git-name NAME               Set or update the managed Git identity name
-  --git-email EMAIL             Set or update the managed Git identity email
+Usage: ./setup [install|verify|doctor|update|uninstall|help] [OPTIONS]
+  --non-interactive          Reuse saved choices; no prompts
+  --git-name NAME            One local Git identity
+  --git-email EMAIL
   --tools minimal|recommended|all
-  --with ITEM                   Add a tool or group
-  --without ITEM                Remove a tool or group
-  --docker desktop|wsl-engine|none
+  --with TOOL               Add an individual tool (repeatable)
+  --without TOOL            Remove an individual tool (repeatable)
+  --docker wsl-engine|none   WSL Engine is the default
   --default-shell zsh|bash|unchanged
-  --reconfigure              Prompt again, using saved choices as defaults
-  --dry-run                   Show the installation plan without changing files
-  --no-doctor                 Skip final doctor checks after install/linking
-  --verbose
-  --log
-  -h, --help
+  --reconfigure             Ask again using saved choices
+  --dry-run                 No writes, downloads, or sudo
+  --no-doctor               Skip final diagnostics
 
-Examples:
-  ./setup
-  ./setup install --non-interactive --profile personal --git-name "Test User" --git-email test@example.com
-  ./setup install --tools recommended --with history --docker wsl-engine
-  ./setup install --profile work --with corporate-ca
+Core: zsh, Starship, zoxide, fzf, suggestions and highlighting.
+Optional: ripgrep fd bat eza jq yq gh tmux tree direnv atuin mise
+          node dotnet python go uv java
+Runtimes are never included in the default or recommended preset.
+Example:
+  ./setup install --with node --with python
 EOF
 }
-
-while [[ $# -gt 0 ]]; do
+value() { [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || die "$1 requires a value"; }
+while (( $# )); do
   case "$1" in
-    install|verify|doctor|update|uninstall|help)
-      COMMAND="$1"
-      shift
-      ;;
-    --non-interactive)
-      NON_INTERACTIVE=1
-      shift
-      ;;
-    --profile)
-      PROFILE="${2:-}"
-      PROFILE_FLAG=1
-      shift 2
-      ;;
-    --git-name)
-      GIT_NAME="${2:-}"
-      GIT_NAME_FLAG=1
-      shift 2
-      ;;
-    --git-email)
-      GIT_EMAIL="${2:-}"
-      GIT_EMAIL_FLAG=1
-      shift 2
-      ;;
-    --tools)
-      TOOLS_PRESET="${2:-}"
-      TOOLS_FLAG=1
-      shift 2
-      ;;
-    --with)
-      WITH_ITEMS+=("${2:-}")
-      shift 2
-      ;;
-    --without)
-      WITHOUT_ITEMS+=("${2:-}")
-      shift 2
-      ;;
-    --docker)
-      DOCKER_STRATEGY="${2:-}"
-      DOCKER_FLAG=1
-      shift 2
-      ;;
-    --default-shell)
-      DEFAULT_SHELL="${2:-}"
-      DEFAULT_SHELL_FLAG=1
-      shift 2
-      ;;
-    --reconfigure)
-      RECONFIGURE=1
-      shift
-      ;;
-    --dry-run)
-      DRY_RUN=1
-      shift
-      ;;
-    --no-doctor)
-      NO_DOCTOR=1
-      shift
-      ;;
-    --verbose)
-      VERBOSE=1
-      shift
-      ;;
-    --log)
-      LOG_ENABLED=1
-      shift
-      ;;
-    -h|--help)
-      COMMAND="help"
-      shift
-      ;;
-    *)
-      die "Unknown argument: $1"
-      ;;
+    install|verify|doctor|update|uninstall|help) COMMAND="$1"; shift ;;
+    --non-interactive) NON_INTERACTIVE=1; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    --reconfigure) RECONFIGURE=1; shift ;;
+    --no-doctor) NO_DOCTOR=1; shift ;;
+    --profile) die "--profile has been retired. This branch uses one account and one Git identity." ;;
+    --git-name|--git-email|--tools|--with|--without|--docker|--default-shell)
+      value "$@"
+      case "$1" in
+        --git-name) GIT_NAME="$2" ;;
+        --git-email) GIT_EMAIL="$2" ;;
+        --tools) TOOLS_PRESET="$2" ;;
+        --with) WITH_ITEMS+=("$2") ;;
+        --without) WITHOUT_ITEMS+=("$2") ;;
+        --docker) DOCKER_STRATEGY="$2"; DOCKER_FLAG=1 ;;
+        --default-shell) DEFAULT_SHELL="$2"; DEFAULT_SHELL_FLAG=1 ;;
+      esac
+      shift 2 ;;
+    --help|-h) COMMAND=help; shift ;;
+    *) die "Unknown option: $1" ;;
   esac
 done
-
-export NON_INTERACTIVE PROFILE GIT_NAME GIT_EMAIL GIT_NAME_FLAG GIT_EMAIL_FLAG GIT_IDENTITY_WRITE TOOLS_PRESET DOCKER_STRATEGY DEFAULT_SHELL RECONFIGURE VERBOSE LOG_ENABLED DRY_RUN NO_DOCTOR
-export PROFILE_FLAG TOOLS_FLAG DOCKER_FLAG DEFAULT_SHELL_FLAG
-
+if [[ "$DOCKER_FLAG" == 0 && -f "$DOTFILES_CONFIG_DIR/docker" ]]; then DOCKER_STRATEGY="$(<"$DOTFILES_CONFIG_DIR/docker")"; fi
+if [[ "$DEFAULT_SHELL_FLAG" == 0 && -f "$DOTFILES_CONFIG_DIR/default-shell" ]]; then DEFAULT_SHELL="$(<"$DOTFILES_CONFIG_DIR/default-shell")"; fi
+export NON_INTERACTIVE DRY_RUN RECONFIGURE NO_DOCTOR GIT_NAME GIT_EMAIL
+case "$DEFAULT_SHELL" in zsh|bash|unchanged) ;; *) die "Invalid default shell: $DEFAULT_SHELL";; esac
+case "$DOCKER_STRATEGY" in wsl-engine|none) ;; *) die "Use --docker wsl-engine or none";; esac
 case "$COMMAND" in
-  install)
+  help) usage ;;
+  install|update)
     source "$DOTFILES_ROOT/install/install.sh"
-    action_install "${WITH_ITEMS[@]}" -- "${WITHOUT_ITEMS[@]}"
-    ;;
-  update)
-    source "$DOTFILES_ROOT/install/install.sh"
-    action_install "${WITH_ITEMS[@]}" -- "${WITHOUT_ITEMS[@]}"
-    ;;
-  verify)
+    action_install ;;
+  verify|doctor)
     source "$DOTFILES_ROOT/install/verify.sh"
-    action_verify
-    ;;
-  doctor)
-    source "$DOTFILES_ROOT/install/doctor.sh"
-    action_doctor
-    ;;
+    action_verify ;;
   uninstall)
     source "$DOTFILES_ROOT/install/uninstall.sh"
-    action_uninstall
-    ;;
-  help)
-    usage
-    ;;
-  *)
-    die "Unknown command: $COMMAND"
-    ;;
+    action_uninstall ;;
 esac

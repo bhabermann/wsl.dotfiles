@@ -1,24 +1,7 @@
-FROM ubuntu:26.04
-
+FROM debian:13-slim
 ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-    bash \
-    ca-certificates \
-    coreutils \
-    curl \
-    diffutils \
-    findutils \
-    git \
-    grep \
-    sed \
-    zsh \
-  && rm -rf /var/lib/apt/lists/*
-
+RUN apt-get update && apt-get install -y --no-install-recommends bash git zsh ca-certificates curl starship zoxide fzf && rm -rf /var/lib/apt/lists/*
 WORKDIR /workspace
 COPY . /workspace
-
-RUN chmod +x /workspace/setup /workspace/install/*.sh /workspace/scripts/*.sh
-
-CMD ["/workspace/scripts/test-in-docker.sh"]
+RUN chmod +x setup install/*.sh scripts/*.sh scripts/docker-wsl scripts/wslview
+CMD ["bash", "/workspace/scripts/test-linux.sh"]

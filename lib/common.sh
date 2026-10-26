@@ -47,10 +47,10 @@ is_wsl() {
   [[ -n "${WSL_INTEROP:-}" ]] || [[ -e /proc/sys/fs/binfmt_misc/WSLInterop ]]
 }
 
-is_ubuntu_2604() {
+is_debian_13() {
   [[ -r /etc/os-release ]] || return 1
   . /etc/os-release
-  [[ "${ID:-}" == "ubuntu" && "${VERSION_ID:-}" == "26.04" ]]
+  [[ "${ID:-}" == debian && "${VERSION_ID:-}" == 13 ]]
 }
 
 confirm() {

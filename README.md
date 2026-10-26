@@ -1,287 +1,153 @@
-# wsl.dotfiles
+# wsl.dotfiles — one account
 
-Public-safe dotfiles for Ubuntu 26.04 on WSL2 running on Windows 11.
+A lean Debian 13 WSL 2 development environment for Windows 11 x64: one Linux
+user, one Git identity, zsh, and Docker Engine. Windows setup runs without
+administrator privileges. WSL 2 must already be enabled.
 
-This project is interactive by default and keeps machine-specific identity,
-secrets, and overrides outside the repository.
+## Start from Windows
 
-## Quick Start
+From this checkout in PowerShell:
 
-Bootstrap from a fresh Ubuntu shell with one command:
-
-```bash
-git clone https://github.com/bhabermann/wsl.dotfiles.git ~/.dotfiles && cd ~/.dotfiles && ./setup install
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\install.ps1
 ```
 
-Or use the step-by-step form:
+Setup offers individual Windows apps and Linux tools, asks for a Linux password
+and Git identity, and creates a distro named `dev` under
+`%LOCALAPPDATA%\wsl\dev`. Linux sudo requires that password after provisioning.
+The new distro and its Windows Terminal profile become defaults after successful
+setup. Existing distros and unrelated profile settings remain available.
+
+Windows Terminal uses Catppuccin Mocha and JetBrains Mono Nerd Font Mono. Missing
+font faces install under the current user's font directory and HKCU font key.
+No machine-wide package install or elevation fallback is used. Optional apps
+that cannot install per user are reported rather than installed system-wide.
+
+Customize from a PowerShell session:
+
+```powershell
+.\windows\install.ps1 -Distribution dev -LinuxUser developer `
+  -Apps powershell,git,vscode,zoxide,starship,mise `
+  -Integrations zoxide,starship,mise -LinuxTools ripgrep,fd,bat,gh,node,python
+
+.\windows\install.ps1 -DryRun -NonInteractive
+.\windows\install.ps1 -Reconfigure
+```
+
+`-InstallDirectory` changes the initial disk location. `-KeepDefaults` adds the
+new environment without changing the WSL or Terminal defaults. `-SkipApps`
+skips optional Windows app installation. Terminal, fonts, and the Docker bridge
+are core preparation. An existing distro with an unmanaged name is never adopted.
+
+Choices are saved under `%LOCALAPPDATA%\wsl.dotfiles`. Reruns reuse them.
+First provisioning is interactive for password entry; `-NonInteractive` supports
+managed reruns with an existing password and saved Git identity. A temporary
+sudo rule is scoped to the provisioning process and removed on exit.
+
+## Shell and tool choices
+
+Core Linux tools: zsh, Starship, zoxide, fzf, Git/SSH, suggestions, syntax
+highlighting, and pinned additional completions. Ctrl-R searches history with
+fzf, Ctrl-T selects files, Alt-C selects a directory, and `z` / `zi` navigate
+with zoxide. Optional Atuin takes over the history shortcut when selected.
+
+Choose individual optional tools: `ripgrep`, `fd`, `bat`, `eza`, `jq`, `yq`,
+`gh`, `tmux`, `tree`, `direnv`, `atuin`, `mise`, `node`, `dotnet`, `python`,
+`go`, `uv`, and `java`. Debian's `yq` is the jq-based implementation.
+
+No language runtime is installed by default. The recommended Linux preset adds
+ripgrep, fd, bat, eza, jq, gh, tmux, and direnv. Mise installs only the selected
+runtimes, using the versions in `mise/default-tools.toml`.
+
+Inside the new distro:
 
 ```bash
-git clone https://github.com/bhabermann/wsl.dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
-./setup install
-```
-
-For automation:
-
-```bash
-./setup install \
-  --non-interactive \
-  --profile personal \
-  --git-name "Your Name" \
-  --git-email you@example.com \
-  --tools recommended \
-  --docker wsl-engine \
-  --default-shell zsh
-```
-
-## Commands
-
-```bash
-./setup install
+./setup install --with node --with python
+./setup install --reconfigure
+./setup install --dry-run
 ./setup verify
 ./setup doctor
 ./setup update
-./setup uninstall
+./setup uninstall  # guidance only; does not delete data
 ```
 
-Useful install options:
+`--tools minimal|recommended|all` replaces the saved baseline; `--with TOOL`
+and `--without TOOL` override it. `--docker wsl-engine|none` controls Docker.
+`--default-shell zsh|bash|unchanged` controls the login shell. Use
+`--non-interactive --git-name "Your Name" --git-email you@example.com` for a
+fresh Linux-only setup. Work/personal profiles and corporate CA tooling have
+been removed; `--profile` reports its retirement.
 
-```bash
-./setup install --dry-run
-./setup install --no-doctor
-./setup install --reconfigure
-```
+Mise shims are the fast default on Windows and Linux. They select runtime
+versions for the current project without running environment hooks at startup.
+For full environment activation, use `-MiseActivation full` on Windows, or add
+`export DOTFILES_MISE_ACTIVATE=1` to `~/.config/dotfiles/local.env` in Linux.
 
-- `--dry-run` previews the environment, identity, tool choices, Docker strategy,
-  and installation plan without creating files, links, backups, or installing
-  tools.
-- `--no-doctor` skips the final doctor checks after a normal install.
-- `--default-shell zsh` or `--default-shell bash` selects the login shell. Interactive installs ask
-  before changing the login shell; non-interactive installs leave it unchanged
-  unless this option is provided.
-- `--reconfigure` edits saved setup choices. Prompts show the saved value as the
-  default, so pressing Enter keeps the current selection.
+Windows zoxide, Starship, and mise installations and profile integrations are
+separate choices. Initialization scripts are generated during setup, then loaded
+from local files. There are no shell-startup downloads, updates, or version
+probes. Rerun setup after upgrading these tools to refresh cached initialization.
+Known existing initializers are migrated; custom code is preserved and duplicate
+managed initialization is skipped with a setup-time warning.
 
-Every real install first bootstraps the Ubuntu packages that later setup steps
-assume are present:
+Bash and zsh rc files remain regular user-owned files with a small managed source
+block. Existing Git and SSH files are backed up or preserved. Keep local secrets
+in `~/.config/dotfiles/secrets.env`; they are never added to this repository.
+Use `~/src` for projects stored on the Linux filesystem.
 
-```text
-build-essential curl wget git openssh-client ca-certificates openssl gnupg jq unzip zip less locales software-properties-common xdg-utils libicu78 libssl3t64 zlib1g libgssapi-krb5-2 tzdata
-```
+## Docker from Windows
 
-Dependency setup appears in the installation plan, but it is not a selectable
-or persisted tool group.
+Docker Engine, Compose, and Buildx run inside the new distro. No Docker Desktop
+installation or network-exposed Docker API is needed. Opening the distro or
+running a Windows Docker command starts it on demand; the bridge waits up to
+30 seconds for daemon readiness. There is no Windows sign-in startup task.
 
-Immediately after those Ubuntu packages are present, setup runs the CA refresh
-before installing runtimes, Docker, or other network-heavy tools.
-
-The runtime libraries include the native ICU, SSL, Kerberos, timezone, and
-compression dependencies required by mise-managed .NET. The installer also
-provides `wslview`; commands honoring `BROWSER` open URLs in the default Windows
-browser through `explorer.exe`.
-
-After a real install, setup saves the selected profile, tool groups, Docker
-strategy, and default-shell choice under `~/.config/dotfiles/`. Plain reruns
-reuse those choices and skip onboarding prompts, then show the final
-installation confirmation in interactive mode.
-
-Explicit flags such as `--profile`, `--tools`, `--with`, `--without`,
-`--docker`, and `--default-shell` override the saved baseline for that run and
-are persisted after a real install.
-
-Existing Git identity values are detected and displayed. Interactive reruns ask
-whether to change them and default to preserving them; explicit `--git-name`
-and `--git-email` flags update the managed identity.
-
-## Interactive Tool Selection
-
-The installer asks which groups to install. Each prompt includes a yes/no
-choice, a recommendation tag when applicable, and a short explanation.
-The interactive flow is grouped into sections: Environment, Identity, Tool
-Selection, Docker, Installation Plan, Installation, Linking, and Doctor.
-On reruns, existing local setup choices and Git identity are shown and
-preserved instead of being requested again. `./setup install --reconfigure`
-asks the setup questions again with saved values preselected.
-
-Example:
-
-```text
-[Y/n] Shell       (Recommended) zsh, Starship, zoxide, fzf, and pinned plugins for a fast interactive shell.
-[y/N] History                   Atuin enhanced searchable shell history.
-```
-
-Recommended groups:
-
-- `shell`: zsh, prompt, navigation, fuzzy search, and plugins.
-- `modern-cli`: apt-installed search/listing/readability tools, GitHub CLI, YAML/JSON tools, and tmux.
-- `runtime`: mise-managed global `node@24.17.0`, `dotnet@10.0.301`, `python@3.13.14`, `go@1.26.3`, `uv@0.11.21`, and `java@21`.
-
-Optional groups:
-
-- `history`: Atuin.
-- `corporate-ca`: explicit rerun of the CA refresh for TLS interception CAs.
-
-The CA refresh also runs automatically after dependency setup on every real
-install.
-
-## Package Policy
-
-Ubuntu apt owns WSL system tools and general CLIs. That includes `zsh`, `fzf`,
-`direnv`, `starship`, `zoxide`, `zsh-autosuggestions`,
-`zsh-syntax-highlighting`, `atuin`, `ripgrep`, `fd-find`, `bat`, `tree`,
-`tmux`, `jq`, `gh`, `eza`, and `yq`. `zsh-completions` remains a Git-installed
-exception because Ubuntu 26.04 does not package it.
-
-Both Bash and Zsh are configured regardless of the selected login shell. Setup
-keeps `~/.bashrc` and `~/.zshrc` as regular user-owned files and maintains one
-small source block in each. Shared environment, PATH, aliases, profile loading,
-and local overrides live under `~/.config/dotfiles/shell/`; shell-specific
-history, completion, hooks, plugins, and prompt setup remain separate. Rerunning
-setup repairs missing or malformed managed source blocks while preserving user
-content outside those blocks.
-
-mise is installed from its official Ubuntu 26.04 PPA and owns globally
-available developer language runtimes and project version switching for
-`node`, `dotnet`, `python`, `go`, `uv`, and `java`. The managed defaults are
-`node@24.17.0`, `dotnet@10.0.301`, `python@3.13.14`, `go@1.26.3`,
-`uv@0.11.21`, and `java@21`. The installer links
-the global mise config into `~/.config/mise/`, keeps `~/.local/bin` and
-`~/.local/share/mise/shims` on `PATH`, activates mise from both Bash and Zsh,
-and installs the managed global toolchain during setup so new shells should not
-require a manual `mise install`.
-
-Docker is selected with one strategy prompt:
-
-- WSL Docker Engine: recommended default, installs Docker Engine inside WSL.
-- Docker Desktop: optionally verifies Windows-side WSL integration.
-- None: skips Docker setup.
-
-## Profiles and Secrets
-
-Repo-managed templates:
-
-- `profiles/personal.env`
-- `profiles/work.env`
-- `templates/git/identity.gitconfig.template`
-- `templates/dotfiles/local.env.template`
-- `templates/ssh/config.template`
-
-Machine-local files:
-
-- `~/.config/dotfiles/profile`
-- `~/.config/dotfiles/local.env`
-- `~/.config/dotfiles/selected-tools`
-- `~/.config/dotfiles/default-shell`
-- `~/.config/dotfiles/corporate-ca.env`
-- `~/.config/dotfiles/secrets.env`
-- `~/.config/git/identity.gitconfig`
-- `~/.ssh/config`
-
-The installer creates local files only when missing.
-
-## When Corporate CA Is Needed
-
-Some networks intercept TLS and present a locally trusted CA. Setup runs the CA
-refresh immediately after Ubuntu base packages are installed, before `mise`,
-Docker, or other network-heavy setup. Runtime installation also verifies the
-`mise-versions.jdx.dev` HTTPS path before `mise install` and retries CA refresh
-once if TLS verification fails. If tools such as `curl`, `git`, `mise`, `npm`,
-package installers, or Docker setup still fail with certificate verification
-errors, review `~/.config/dotfiles/corporate-ca.env` and rerun:
-
-```bash
-./scripts/update-corporate-ca --config ~/.config/dotfiles/corporate-ca.env
-```
-
-The installer copies
-`templates/dotfiles/corporate-ca.env.template` to
-`~/.config/dotfiles/corporate-ca.env` when missing. The default config targets
-the public download hosts used by this installer. Put any machine-local
-hostnames, test URLs, or subject/issuer allowlist regex there. The repository
-intentionally does not include company-specific hosts or certificate authority
-names.
-
-On WSL, the refresh checks Windows certificate stores such as
-`Cert:\LocalMachine\Root` and `Cert:\CurrentUser\Root`. It installs only CA
-certificates whose subject matches an issuer from the configured host
-certificate chains, CA certificates presented by configured host chains, or CA
-certificates that match your local allowlist. This handles the common case
-where a local root CA is trusted by Windows but not yet installed in Ubuntu,
-which can otherwise break tools like `mise` with `unable to get local issuer
-certificate`.
-
-Preview the refresh without changing system trust:
-
-```bash
-./scripts/update-corporate-ca --config ~/.config/dotfiles/corporate-ca.env --dry-run
-```
-
-## Windows Bootstrap
-
-From PowerShell:
+After reopening PowerShell or cmd:
 
 ```powershell
-.\windows\install.ps1
+docker version
+docker build -t my-app .
+docker compose up -d
+docker run --rm -v "${PWD}:/work:ro" busybox:1.37.0 ls /work
 ```
 
-Non-interactive example:
+PowerShell uses a function; cmd and programs resolving commands through PATH
+use `docker.cmd`. Both explicitly target the configured distro and retain the
+current Windows working directory. The bridge supports Windows drive paths in:
+
+- build/buildx contexts and Dockerfile `-f` / `--file`;
+- Compose `-f` / `--file`, `--project-directory`, and `--env-file`;
+- run/create `-v` / `--volume`, bind `--mount`, and `--env-file`;
+- `docker cp` source/destination paths.
+
+Relative paths and Linux paths pass through. Other Docker arguments are not
+rewritten. Native Windows clients that require a Docker API endpoint are outside
+this wrapper's scope. Windows shell quoting rules still apply to cmd commands.
+
+## Verification
 
 ```powershell
-.\windows\install.ps1 -NonInteractive -Preset Recommended
+.\scripts\test-windows.ps1 -FontTest -Benchmark
+.\scripts\test-wsl.ps1
 ```
 
-The Windows bootstrap uses winget and asks about each tool by default.
-
-## Docker
-
-Docker Engine inside WSL is the recommended default:
+Windows fixtures use temporary profiles, settings, and a scratch registry key.
+The font test exercises all four font faces without touching the real font
+registry key. The WSL integration test creates a uniquely named disposable distro,
+checks real Docker builds, mounts, Compose, PowerShell 5.1/7 and cmd forwarding,
+and removes the test distro afterward. It requires network access and disk space.
+It does not change daily-use defaults or profiles.
 
 ```bash
-./setup install --docker wsl-engine
+bash scripts/test-linux.sh
+bash scripts/test-docker.sh
 ```
 
-Docker Desktop integration remains available as an explicit opt-in:
+`DOTFILES_TEST_MODE=1` is a fixture-only mode that skips package and system changes.
+The Debian container suite tests installer behavior; real systemd/WSL behavior is
+covered by the disposable-distro test. See `docs/validation.md` for measured results.
 
-```bash
-./setup install --docker desktop
-```
-
-## Test Pipeline
-
-Run the Docker test pipeline from the repo root:
-
-```bash
-./scripts/test-docker.sh
-```
-
-Docker Engine must be running inside WSL. Setup enables its systemd service and
-adds a managed PowerShell `docker` function that forwards to this WSL distro.
-The test script uses `docker` when available
-and can still fall back to `docker.exe` when Docker Desktop integration is used.
-If Docker group membership was added during setup but the current shell session
-is stale, the Docker test wrapper re-enters through `newgrp docker` so the test
-command can run without requiring a manual logout/login cycle first.
-
-The pipeline builds `Dockerfile.test` with Ubuntu 26.04 and runs:
-
-- Bash syntax checks.
-- `./setup help` smoke test.
-- Tool selection parser tests for presets, `--with`, `--without`, and Docker strategy.
-- Non-interactive install in `DOTFILES_TEST_MODE=1` with an isolated fake home.
-- Dry-run and no-doctor behavior checks.
-- zsh startup checks for repo root detection, aliases, and module loading.
-- Idempotency checks that local identity and SSH config are not overwritten.
-- `verify` and `doctor` smoke tests.
-
-`DOTFILES_TEST_MODE=1` skips package downloads, external installers, Docker Engine
-changes, and Windows/WSL integration checks so the container can validate behavior
-without mutating the host or depending on Windows APIs.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the repository policy and validation
-checks.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+The rootfs and font URLs/checksums are pinned in `windows/assets.lock.json`.
+Update both URL and SHA256 when refreshing those assets; a checksum failure stops
+the installer before importing or registering the download.

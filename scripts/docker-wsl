@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Called by the Windows bridge. Never evaluate Docker arguments as shell code.
+set -euo pipefail
+windows_path() { [[ "$1" =~ ^[A-Za-z]:[\\/]|^\\\\ ]]; }
+translate_path() {
+  if windows_path "$1"; then wslpath -u "$1"; else printf '%s' "$1"; fi
+}
+translate_volume() {
+  local value="$1" source rest
+  if [[ "$value" =~ ^([A-Za-z]:[\\/][^:]*)(:.*)$ ]]; then
+    source="${BASH_REMATCH[1]}" rest="${BASH_REMATCH[2]}"
+    printf '%s%s' "$(translate_path "$source")" "$rest"
+  else printf '%s' "$value"; fi
+}
+translate_mount() {
+  local value="$1" field result="" old_ifs="$IFS"
+  # Named volumes must not be treated as filesystem paths.
+  if [[ ",$value," != *,type=bind,* ]]; then printf '%s' "$value"; return; fi
+  local fields=()
+  IFS=, read -r -a fields <<< "$value"
+  IFS="$old_ifs"
+  for field in "${fields[@]}"; do
+    case "$field" in source=*|src=*) field="${field%%=*}=$(translate_path "${field#*=}")";; esac
+    result+="${result:+,}$field"
+  done
+  printf '%s' "$result"
+}
+mode="" index=0
+args=("$@") output=()
+for ((index=0; index<${#args[@]}; index++)); do
+  case "${args[index]}" in
+    run|create|compose|build|cp|exec) mode="${args[index]}"; break ;;
+    buildx) mode=build; break ;;
+    --context|-c|--host|-H|--config|--log-level) ((index+=1)) ;;
+    -*) ;;
+    *) break ;;
+  esac
+done
+command_index=$index
+path_next=0 volume_next=0 mount_next=0 value_next=0
+run_options=1
+for ((index=0; index<${#args[@]}; index++)); do
+  arg="${args[index]}"
+  if (( path_next )); then
+    arg="$(translate_path "$arg")"; path_next=0
+  elif (( volume_next )); then
+    arg="$(translate_volume "$arg")"; volume_next=0
+  elif (( mount_next )); then
+    arg="$(translate_mount "$arg")"; mount_next=0
+  elif (( value_next )); then
+    value_next=0
+  elif (( index > command_index )); then
+    case "$mode" in
+      run|create)
+        if (( run_options )); then
+          case "$arg" in
+            --) run_options=0 ;;
+            -v|--volume) volume_next=1 ;;
+            --volume=*) arg="--volume=$(translate_volume "${arg#*=}")" ;;
+            -v?*) arg="-v$(translate_volume "${arg:2}")" ;;
+            --mount) mount_next=1 ;;
+            --mount=*) arg="--mount=$(translate_mount "${arg#*=}")" ;;
+            --env-file) path_next=1 ;;
+            --env-file=*) arg="--env-file=$(translate_path "${arg#*=}")" ;;
+            --name|--network|--net|--hostname|-h|--user|-u|--workdir|-w|--entrypoint|--env|-e|--publish|-p|--label|-l|--add-host|--cap-add|--cap-drop|--device|--gpus|--memory|-m|--cpus|--restart|--security-opt|--platform|--pull|--ipc|--pid|--ulimit|--tmpfs|--userns|--shm-size|--log-driver|--log-opt|--health-cmd|--health-interval|--health-timeout|--health-retries|--stop-signal|--stop-timeout|--runtime|--label-file|--cidfile|--attach|-a|--expose|--dns|--dns-search|--group-add) value_next=1 ;;
+            -*) ;;
+            *) run_options=0 ;;
+          esac
+        fi ;;
+      compose|build)
+        case "$arg" in
+          -f|--file|--env-file|--project-directory|--project-name-file) path_next=1 ;;
+          --file=*|--env-file=*|--project-directory=*) arg="${arg%%=*}=$(translate_path "${arg#*=}")" ;;
+          *) if [[ "$mode" == build ]] && windows_path "$arg"; then arg="$(translate_path "$arg")"; fi ;;
+        esac ;;
+      cp)
+        if windows_path "$arg"; then arg="$(translate_path "$arg")"; fi ;;
+    esac
+  fi
+  output+=("$arg")
+done
+if [[ "${DOCKER_WSL_SKIP_WAIT:-0}" != 1 ]]; then
+  deadline=$((SECONDS + 30))
+  until docker info >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then
+      echo "Docker in ${WSL_DISTRO_NAME:-WSL} did not become ready within 30s. Check systemctl status docker." >&2
+      exit 1
+    fi
+    sleep 0.25
+  done
+fi
+exec docker "${output[@]}"
