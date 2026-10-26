@@ -1,0 +1,20 @@
+install/install.sh
+  h_16f42e4034fc35 3,49,115-119
+install/verify.sh
+  h_16f42e4034fc35 3,10-13
+scripts/test-linux.sh
+  h_16f42e4034fc35 71-98
+scripts/test-wsl.ps1
+  h_16f42e4034fc35 33-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dfd854ddf3e1e12e4a08d16780295f1d24b541c7",
+  "prompts": {},
+  "humans": {
+    "h_16f42e4034fc35": {
+      "author": "Bruno Habermann <7130275+bhabermann@users.noreply.github.com>"
+    }
+  }
+}
