@@ -1,8 +1,8 @@
 # wsl.dotfiles â€” one account
 
 A lean Debian 13 WSL 2 development environment for Windows 11 x64: one Linux
-user, one Git identity, zsh, and Docker Engine. Windows setup runs without
-administrator privileges. WSL 2 must already be enabled.
+user, one Git identity, zsh, and Docker Engine. The Windows bootstrap can enable
+WSL when needed; that prerequisite requires administrator approval.
 
 ## Start from Windows
 
@@ -12,16 +12,24 @@ From this checkout in PowerShell:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\install.ps1
 ```
 
-Setup offers individual Windows apps and Linux tools, asks for a Linux password
-and Git identity, and creates a distro named `dev` under
+Setup asks for Windows apps, Linux tools, and Git identity up front, then shows
+the installation plan. It asks for a Linux password during provisioning and
+creates a distro named `dev` under
 `%LOCALAPPDATA%\wsl\dev`. Linux sudo requires that password after provisioning.
+If WSL needs installation, approve the elevated WSL installer and restart Windows
+when prompted. Setup resumes once at the next sign-in. If it does not, rerun
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\install.ps1 -Resume`;
+include `-Distribution NAME` for a custom distro. Your selections are saved,
+but the Linux password is never saved by the Windows script.
+
 The new distro and its Windows Terminal profile become defaults after successful
 setup. Existing distros and unrelated profile settings remain available.
 
 Windows Terminal uses Catppuccin Mocha and JetBrains Mono Nerd Font Mono. Missing
 font faces install under the current user's font directory and HKCU font key.
-No machine-wide package install or elevation fallback is used. Optional apps
-that cannot install per user are reported rather than installed system-wide.
+Aside from enabling WSL itself when needed, no machine-wide package installation
+or elevation fallback is used. Optional apps that cannot install per user are
+reported rather than installed system-wide.
 
 Customize from a PowerShell session:
 
@@ -30,7 +38,7 @@ Customize from a PowerShell session:
   -Apps powershell,git,vscode,zoxide,starship,mise `
   -Integrations zoxide,starship,mise -LinuxTools ripgrep,fd,bat,gh,node,python
 
-.\windows\install.ps1 -DryRun -NonInteractive
+.\windows\install.ps1 -DryRun -NonInteractive -GitName 'Your Name' -GitEmail you@example.com
 .\windows\install.ps1 -Reconfigure
 ```
 
@@ -41,7 +49,9 @@ are core preparation. An existing distro with an unmanaged name is never adopted
 
 Choices are saved under `%LOCALAPPDATA%\wsl.dotfiles`. Reruns reuse them.
 First provisioning is interactive for password entry; `-NonInteractive` supports
-managed reruns with an existing password and saved Git identity. A temporary
+managed reruns with an existing password and saved Git identity. A dry run uses
+the supplied or existing Git identity and includes both sets of tool choices.
+A temporary
 sudo rule is scoped to the provisioning process and removed on exit.
 
 ## Shell and tool choices

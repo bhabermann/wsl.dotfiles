@@ -25,6 +25,71 @@ try {
         [Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors) | Out-Null
         Assert-True ($errors.Count -eq 0) "Parse failed: $file"
     }
+    # Exercise the Windows planner with a fake WSL command and an isolated state directory.
+    $planner = Join-Path $repo 'windows\install.ps1'
+    $originalLocalAppData = $env:LOCALAPPDATA
+    $env:LOCALAPPDATA = Join-Path $testRoot 'planner-local'
+    $global:fixtureWslMissing = $false
+    function wsl.exe {
+        if ($global:fixtureWslMissing) { $global:LASTEXITCODE = 1; return }
+        $global:LASTEXITCODE = 0
+        if ($args[0] -eq '--version') { return 'fixture WSL' }
+        if ($args[0] -eq '--list') { return }
+        throw "Unexpected WSL call in planner test: $args"
+    }
+    try {
+        $base = @{ DryRun=$true; NonInteractive=$true; LinuxUser='fixture'; GitName='Fixture User'; GitEmail='fixture@example.invalid'; Apps=@() }
+        $empty = (& $planner @base -LinuxTools @() 6>&1 | Out-String)
+        Assert-True ($empty -match 'Linux optional tools: \s*\r?\n') 'Explicit empty Linux selection was not retained'
+        $selected = (& $planner @base -LinuxTools @('fd','python') 6>&1 | Out-String)
+        Assert-True ($selected -match 'Linux optional tools: fd, python') 'Linux selection missing from plan'
+        $defaults = (& $planner @base 6>&1 | Out-String)
+        Assert-True ($defaults -match 'Linux optional tools: ripgrep, fd, bat, eza, jq, gh, tmux, direnv') 'Recommended tools missing from plan'
+        $failed = $false
+        try { & $planner @base -LinuxTools 'not-a-tool' 6>&1 | Out-Null } catch { $failed = $true }
+        Assert-True $failed 'Unknown Linux tool accepted'
+        Assert-True (-not (Test-Path -LiteralPath $env:LOCALAPPDATA)) 'Planner dry run wrote state'
+        $global:fixtureWslMissing = $true
+        $missing = (& $planner @base -LinuxTools @('fd') 6>&1 | Out-String)
+        Assert-True ($missing -match 'WSL prerequisite ready: False' -and $missing -match 'Linux optional tools: fd') 'Missing-WSL dry run did not display the full plan'
+        $global:fixtureWslMissing = $false
+        $pendingPath = Join-Path $env:LOCALAPPDATA 'wsl.dotfiles\pending\fixture.json'
+        $pending = @{ distribution='fixture'; linuxUser='fixture'; installDirectory=(Join-Path $testRoot disk); apps=@(); integrations=@(); linuxTools=@('fd'); gitName='Fixture User'; gitEmail='fixture@example.invalid'; miseActivation='shims'; keepDefaults=$true; skipApps=$true }
+        Write-Utf8File $pendingPath ($pending | ConvertTo-Json)
+        $resumed = (& $planner -Distribution fixture -Resume -DryRun 6>&1 | Out-String)
+        Assert-True ($resumed -match 'Linux optional tools: fd' -and $resumed -match 'Git identity: Fixture User') 'Resume lost saved choices'
+        Assert-True (Test-Path -LiteralPath $pendingPath) 'Resume dry run removed pending state'
+        $global:fixtureWslMissing = $true
+        $global:fixtureResumeCommand = ''
+        $global:fixtureElevationDenied = $false
+        function Read-Host { param($Prompt) return '' }
+        function Start-Process {
+            param($FilePath, $ArgumentList, $Verb, [switch]$Wait, [switch]$PassThru)
+            if ($global:fixtureElevationDenied) { throw 'Fixture elevation denied' }
+            if ($Verb -ne 'RunAs' -or $ArgumentList -notcontains '--no-distribution') { throw 'Wrong WSL prerequisite command' }
+            return [pscustomobject]@{ ExitCode=0 }
+        }
+        function New-Item { param($Path, [switch]$Force) return $null }
+        function New-ItemProperty {
+            param($LiteralPath, $Name, $Value, $PropertyType, [switch]$Force)
+            $global:fixtureResumeCommand = $Value
+        }
+        $interactive = @{ Distribution='prereq'; LinuxUser='fixture'; GitName='Fixture User'; GitEmail='fixture@example.invalid'; Apps=@(); Integrations=@(); LinuxTools=@('fd') }
+        & $planner @interactive 6>&1 | Out-Null
+        $saved = Get-Content -Raw (Join-Path $env:LOCALAPPDATA 'wsl.dotfiles\pending\prereq.json') | ConvertFrom-Json
+        Assert-True ($saved.linuxTools[0] -eq 'fd' -and $saved.gitName -eq 'Fixture User') 'Prerequisite step did not save choices'
+        Assert-True ($global:fixtureResumeCommand -match '-Distribution prereq -Resume') 'One-time resume command was not registered'
+        $global:fixtureElevationDenied = $true
+        $failed = $false
+        try { & $planner @interactive 6>&1 | Out-Null } catch { $failed = $true }
+        Assert-True $failed 'Declined elevation was not reported'
+    } finally {
+        Remove-Item Function:\wsl.exe -ErrorAction SilentlyContinue
+        Remove-Item Function:\Read-Host,Function:\Start-Process,Function:\New-Item,Function:\New-ItemProperty -ErrorAction SilentlyContinue
+        Remove-Variable fixtureWslMissing -Scope Global -ErrorAction SilentlyContinue
+        Remove-Variable fixtureResumeCommand,fixtureElevationDenied -Scope Global -ErrorAction SilentlyContinue
+        $env:LOCALAPPDATA = $originalLocalAppData
+    }
     $jsonc = @'
 {
   // a "defaultProfile": "comment" and URL https://example.com

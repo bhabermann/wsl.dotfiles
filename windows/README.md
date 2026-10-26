@@ -7,8 +7,10 @@ bootstrap from the repository root:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows\install.ps1
 ```
 
-WSL 2 must already be enabled. Windows setup runs per user without elevation;
-Linux system provisioning uses the root access available to the distro owner.
+The script installs WSL if necessary, requesting elevation for that prerequisite.
+If a restart is needed, restart Windows and sign in to resume the saved plan;
+the script displays a manual resume command as a fallback. Other Windows setup
+runs per user; Linux provisioning uses root access available to the distro owner.
 The installer offers individual Windows apps and optional PowerShell integrations
 for zoxide, Starship, and mise. It also prepares a per-user Nerd Font, a themed
 Terminal profile, and Docker commands targeting the new distro.
