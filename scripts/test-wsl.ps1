@@ -30,7 +30,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Distro restart failed' }
     $copy = 'set -euo pipefail; mkdir -p /home/developer/.dotfiles; tar -C "$1" --exclude=.git -cf - . | tar -C /home/developer/.dotfiles -xf -; chown -R developer:developer /home/developer/.dotfiles; find /home/developer/.dotfiles -type f \( -name "*.sh" -o -name setup -o -name docker-wsl -o -name wslview \) -exec chmod +x {} +'
     Invoke-TestWsl @('-u','root','--exec','bash','-c',$copy,'_',$source)
-    Invoke-TestWsl @('-u','root','--exec','bash','/home/developer/.dotfiles/windows/run-setup.sh','developer','install','--non-interactive','--git-name','Fixture Developer','--git-email','fixture@example.invalid','--tools','minimal','--no-doctor') *> (Join-Path $testRoot 'install.log')
+    Invoke-TestWsl @('-u','root','--exec','bash','/home/developer/.dotfiles/windows/run-setup.sh','developer','install','--non-interactive','--git-name','Fixture Developer','--git-email','fixture@example.invalid','--tools','minimal') *> (Join-Path $testRoot 'install.log')
+    $installLog = Get-Content -Raw (Join-Path $testRoot 'install.log')
+    if ($installLog -notmatch 'Docker Engine verified with sudo' -or $installLog -notmatch 'Complete\. Open a new shell\.') { throw 'First Linux installation did not complete with pending Docker group membership' }
     Invoke-TestWsl @('-u','developer','--exec','bash','/home/developer/.dotfiles/scripts/test-linux.sh')
     Invoke-TestWsl @('-u','developer','--exec','bash','-c','test "$(cat /proc/1/comm)" = systemd; test ! -e /etc/sudoers.d/dotfiles-bootstrap-developer; if sudo -n true 2>/dev/null; then exit 1; fi')
     $sizes = @(Invoke-TestWsl @('-u','root','--exec','du','-sxB1','/usr','/var','/home','/etc'))

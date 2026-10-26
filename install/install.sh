@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 action_install() {
+  local DOCKER_GROUP_PENDING=0
   section "Single-account Debian WSL"
   if [[ "${DOTFILES_TEST_MODE:-0}" != 1 ]]; then
     is_debian_13 || die "This branch supports Debian 13. Run windows/install.ps1 to create it."
@@ -45,7 +46,7 @@ action_install() {
     fi
     sudo env DEBIAN_FRONTEND=noninteractive apt-get clean
     sudo rm -rf /var/lib/apt/lists/*
-    if [[ "$NO_DOCTOR" != 1 ]]; then source "$DOTFILES_ROOT/install/verify.sh"; action_verify; fi
+    if [[ "$NO_DOCTOR" != 1 ]]; then source "$DOTFILES_ROOT/install/verify.sh"; action_verify embedded; fi
   fi
   ok "Complete. Open a new shell."
 }
@@ -111,6 +112,11 @@ install_docker() {
   sudo env DEBIAN_FRONTEND=noninteractive apt-get update
   sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   sudo usermod -aG docker "$USER"
+  # usermod changes the account database, not this process's supplementary groups.
+  case " $(id -nG) " in
+    *" docker "*) ;;
+    *) DOCKER_GROUP_PENDING=1 ;;
+  esac
   sudo systemctl enable --now docker
   sudo docker info >/dev/null
   sudo install -m 0755 "$DOTFILES_ROOT/scripts/docker-wsl" /usr/local/bin/dotfiles-docker

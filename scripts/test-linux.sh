@@ -68,6 +68,34 @@ set -e
 test "$status" = 42
 test "$(git config --file "$test_root/failing-home/.config/git/identity.gitconfig" user.name)" = 'Saved Before Failure'
 bash --noprofile --rcfile "$HOME/.bashrc" -ic 'test -n "$DOTFILES"' 2>/dev/null
+(
+  source "$root/lib/common.sh"
+  source "$root/install/verify.sh"
+  DOTFILES_CONFIG_DIR="$test_root/verify"
+  mkdir -p "$DOTFILES_CONFIG_DIR"
+  printf 'wsl-engine\n' > "$DOTFILES_CONFIG_DIR/docker"
+  is_debian_13() { return 0; }
+  managed_source_block_valid() { return 0; }
+  command() { return 0; }
+  docker() { return "${DOCKER_STATUS:-1}"; }
+  sudo() {
+    [[ "$*" == '-n docker info' ]] || return 99
+    printf 'sudo\n' >> "$test_root/verify-sudo"
+    return "${SUDO_DOCKER_STATUS:-0}"
+  }
+  DOCKER_GROUP_PENDING=1
+  action_verify embedded > "$test_root/verify-pending" 2>&1
+  grep -q 'new WSL session' "$test_root/verify-pending"
+  test "$(wc -l < "$test_root/verify-sudo")" = 1
+  if action_verify > /dev/null 2>&1; then echo 'Standalone verify accepted inaccessible Docker' >&2; exit 1; fi
+  test "$(wc -l < "$test_root/verify-sudo")" = 1
+  SUDO_DOCKER_STATUS=1
+  if action_verify embedded > /dev/null 2>&1; then echo 'Embedded verify masked daemon failure' >&2; exit 1; fi
+  SUDO_DOCKER_STATUS=0 DOCKER_GROUP_PENDING=0
+  if action_verify embedded > /dev/null 2>&1; then echo 'Embedded verify accepted unrelated permission failure' >&2; exit 1; fi
+  DOCKER_STATUS=0
+  action_verify > /dev/null 2>&1
+)
 mkdir -p "$test_root/bin"
 cat > "$test_root/bin/docker" <<'EOF'
 #!/usr/bin/env bash
